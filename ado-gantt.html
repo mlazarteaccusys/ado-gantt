@@ -1,0 +1,1000 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ADO Gantt Chart</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 13px; background: #f0f2f5; color: #333; }
+
+/* ── Config overlay ── */
+.config-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.55); z-index: 200; display: flex; align-items: center; justify-content: center; }
+.config-box { background: white; padding: 32px; border-radius: 10px; width: 500px; box-shadow: 0 12px 40px rgba(0,0,0,0.25); }
+.config-box h2 { margin-bottom: 6px; font-size: 18px; }
+.config-box p { font-size: 12px; color: #888; margin-bottom: 24px; }
+.config-field { margin-bottom: 16px; }
+.config-field label { display: block; font-weight: 600; margin-bottom: 4px; font-size: 11px; color: #555; text-transform: uppercase; letter-spacing: 0.5px; }
+.config-field input { width: 100%; padding: 9px 12px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px; transition: border-color .15s; }
+.config-field input:focus { outline: none; border-color: #0078d4; box-shadow: 0 0 0 3px rgba(0,120,212,.12); }
+.config-field small { display: block; margin-top: 4px; font-size: 11px; color: #888; }
+.config-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.config-btn { background: #0078d4; color: white; border: none; padding: 11px 24px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: 600; width: 100%; margin-top: 8px; transition: background .15s; }
+.config-btn:hover { background: #006cbd; }
+
+/* ── Top bar ── */
+.topbar { background: white; border-bottom: 1px solid #e0e0e0; padding: 10px 20px; display: flex; align-items: center; gap: 12px; position: sticky; top: 0; z-index: 100; box-shadow: 0 1px 4px rgba(0,0,0,.06); flex-wrap: wrap; }
+.topbar h1 { font-size: 15px; font-weight: 700; }
+.topbar .sep { width: 1px; height: 20px; background: #e0e0e0; }
+.topbar .spacer { flex: 1; }
+.filters { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.filter-label { font-size: 11px; color: #888; }
+.chip { padding: 3px 10px; border-radius: 12px; border: 1.5px solid #ddd; background: white; cursor: pointer; font-size: 11px; font-weight: 500; transition: all .15s; user-select: none; }
+.chip.on { border-color: #0078d4; background: #e8f3ff; color: #0078d4; }
+.chip.on.epic { border-color: #7c3aed; background: #f3eeff; color: #7c3aed; }
+.chip.on.feature { border-color: #2563eb; background: #eff6ff; color: #2563eb; }
+.chip.on.story { border-color: #059669; background: #ecfdf5; color: #059669; }
+.chip.on.techTask { border-color: #0891b2; background: #ecfeff; color: #0891b2; }
+.chip.on.task { border-color: #d97706; background: #fffbeb; color: #d97706; }
+.chip.on.bug { border-color: #dc2626; background: #fef2f2; color: #dc2626; }
+.chip.on.improvement { border-color: #7c3aed; background: #f5f3ff; color: #7c3aed; }
+.btn { padding: 6px 14px; border-radius: 6px; border: 1px solid #ddd; background: white; cursor: pointer; font-size: 12px; font-weight: 500; transition: background .15s; }
+.btn:hover { background: #f5f5f5; }
+.btn.primary { background: #0078d4; color: white; border-color: #0078d4; }
+.btn.primary:hover { background: #006cbd; }
+.last-update { font-size: 11px; color: #aaa; white-space: nowrap; }
+/* ── Team dropdown ── */
+.team-select-wrap { display: flex; align-items: center; gap: 6px; }
+.team-select-wrap label { font-size: 11px; color: #888; white-space: nowrap; }
+#teamSelect { padding: 5px 10px; border: 1px solid #ddd; border-radius: 6px; font-size: 12px; background: white; cursor: pointer; min-width: 160px; max-width: 240px; }
+#teamSelect:focus { outline: none; border-color: #0078d4; }
+#teamSelect:disabled { color: #aaa; cursor: default; }
+
+/* ── Main wrapper ── */
+.page { padding: 16px; }
+
+/* ── Gantt card ── */
+.gantt-card { background: white; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,.08); overflow: hidden; }
+
+/* ── Gantt layout ── */
+.gantt-inner { display: flex; }
+.g-left { flex-shrink: 0; border-right: 2px solid #e0e0e0; overflow: hidden; }
+.g-right { flex: 1; overflow-x: auto; overflow-y: hidden; position: relative; }
+
+/* ── Left header ── */
+:root { --name-col: 220px; }
+.lh { display: grid; grid-template-columns: var(--name-col) 95px 72px 145px; background: #f7f8fa; border-bottom: 2px solid #e0e0e0; height: 65px; }
+.lh-cell { padding: 0 10px; display: flex; align-items: center; font-size: 11px; font-weight: 700; color: #666; text-transform: uppercase; letter-spacing: 0.4px; border-right: 1px solid #e8e8e8; position: relative; }
+.col-resize { position: absolute; right: 0; top: 0; bottom: 0; width: 6px; cursor: col-resize; background: transparent; z-index: 10; }
+.col-resize:hover, .col-resize.dragging { background: #0078d4; opacity: 0.5; }
+
+/* ── Timeline header ── */
+.th { background: #f7f8fa; border-bottom: 2px solid #e0e0e0; position: sticky; top: 0; z-index: 10; }
+.months-row { display: flex; border-bottom: 1px solid #e0e0e0; height: 30px; }
+.month-cell { border-right: 1px solid #ddd; padding: 0 10px; display: flex; align-items: center; font-weight: 700; font-size: 12px; color: #333; white-space: nowrap; overflow: hidden; flex-shrink: 0; }
+.sprints-row { position: relative; height: 65px; background: #f0f1f3; border-bottom: 1px solid #e0e0e0; }
+.sprint-cell { border-right: 1px solid #ddd; border-left: 1px solid #ddd; padding: 0 8px; display: flex; align-items: center; font-size: 11px; color: #555; white-space: nowrap; overflow: hidden; cursor: default; box-sizing: border-box; background: #f7f8fa; height: 100%; }
+.sprint-cell.current { background: #fff8e1; color: #e65100; font-weight: 700; }
+.sprint-cell.past { color: #aaa; }
+
+/* ── Body rows ── */
+.g-body { }
+.g-row { display: flex; height: 40px; }
+.g-row:nth-child(odd) .l-row, .g-row:nth-child(odd) .t-row { background: #fafafa; }
+.g-row:hover .l-row, .g-row:hover .t-row { background: #f0f6ff !important; }
+
+.l-row { display: grid; grid-template-columns: var(--name-col) 95px 72px 145px; height: 40px; border-right: 2px solid #e0e0e0; border-bottom: 1px solid #f0f0f0; }
+.l-cell { padding: 0 8px; display: flex; align-items: center; border-right: 1px solid #f0f0f0; overflow: hidden; font-size: 12px; }
+
+.t-row { position: relative; height: 40px; border-bottom: 1px solid #f0f0f0; }
+
+/* ── Item name ── */
+.item-name { display: flex; align-items: center; gap: 4px; min-width: 0; }
+.cbtn { background: none; border: none; cursor: pointer; font-size: 9px; color: #999; width: 14px; flex-shrink: 0; line-height: 1; }
+.cbtn:hover { color: #333; }
+.iicon { font-size: 13px; flex-shrink: 0; }
+.ititle { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* ── Status badge ── */
+.sbadge { display: inline-flex; align-items: center; gap: 3px; padding: 2px 7px; border-radius: 10px; font-size: 10px; font-weight: 600; white-space: nowrap; }
+.s-done { background: #dcfce7; color: #15803d; }
+.s-active { background: #dbeafe; color: #1d4ed8; }
+.s-new { background: #f3f4f6; color: #6b7280; }
+.s-removed { background: #fee2e2; color: #b91c1c; }
+.s-resolved { background: #fef3c7; color: #92400e; }
+
+/* ── Progress ── */
+.pbar-wrap { width: 100%; }
+.pbar-pct { font-size: 10px; text-align: center; color: #666; margin-bottom: 2px; }
+.pbar { width: 100%; height: 6px; background: #e5e7eb; border-radius: 3px; overflow: hidden; }
+.pbar-fill { height: 100%; border-radius: 3px; }
+.pf-epic { background: #7c3aed; }
+.pf-feature { background: #2563eb; }
+.pf-story { background: #059669; }
+.pf-techtask { background: #0891b2; }
+.pf-improvement { background: #7c3aed; }
+.pf-task { background: #d97706; }
+.pf-bug { background: #dc2626; }
+
+/* ── Gantt bars ── */
+.gbar { position: absolute; height: 22px; top: 9px; border-radius: 4px; display: flex; align-items: center; padding: 0 7px; cursor: pointer; overflow: hidden; transition: filter .1s, transform .1s; z-index: 5; }
+.gbar:hover { filter: brightness(0.88); transform: scaleY(1.05); }
+.gbar-prog { position: absolute; left: 0; top: 0; height: 100%; border-radius: 4px; opacity: 0.3; background: #000; pointer-events: none; }
+.gbar-lbl { font-size: 11px; color: white; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 500; position: relative; z-index: 1; text-shadow: 0 1px 2px rgba(0,0,0,.3); }
+.b-epic { background: #7c3aed; }
+.b-feature { background: #2563eb; }
+.b-story { background: #059669; }
+.b-techtask { background: #0891b2; }
+.b-improvement { background: #7c3aed; }
+.b-task { background: #d97706; }
+.b-bug { background: #dc2626; }
+
+.gbar-dash { position: absolute; height: 22px; top: 9px; border-radius: 4px; border: 2px dashed #ccc; display: flex; align-items: center; padding: 0 6px; overflow: hidden; opacity: 0.7; z-index: 4; }
+.gbar-dash .gbar-lbl { color: #999; }
+
+/* ── Today line ── */
+.today-line { position: absolute; top: 0; bottom: 0; width: 2px; background: #ef4444; z-index: 20; pointer-events: none; }
+.today-tip { position: absolute; top: -1px; left: -22px; background: #ef4444; color: white; font-size: 10px; font-weight: 700; padding: 2px 5px; border-radius: 3px; white-space: nowrap; }
+
+/* ── Sprint bg shading ── */
+.sprint-bg { position: absolute; top: 0; bottom: 0; z-index: 1; }
+.sprint-bg.even { background: rgba(0,0,0,.015); }
+.sprint-divider { position: absolute; top: 0; bottom: 0; width: 1px; background: #e5e7eb; z-index: 2; pointer-events: none; }
+
+/* ── Loading / error ── */
+.loading { display: flex; align-items: center; justify-content: center; padding: 80px; flex-direction: column; gap: 14px; color: #666; }
+.spinner { width: 36px; height: 36px; border: 3px solid #e5e7eb; border-top-color: #0078d4; border-radius: 50%; animation: spin .8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.err { margin: 24px; padding: 18px; background: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; color: #b91c1c; font-size: 13px; line-height: 1.6; }
+.err strong { display: block; margin-bottom: 6px; }
+.empty { padding: 60px; text-align: center; color: #aaa; }
+
+/* ── Tooltip ── */
+.gtt { position: fixed; background: #1e293b; color: white; font-size: 12px; padding: 8px 12px; border-radius: 6px; pointer-events: none; z-index: 999; max-width: 280px; line-height: 1.5; display: none; box-shadow: 0 4px 12px rgba(0,0,0,.3); }
+</style>
+</head>
+<body>
+
+<!-- Config overlay -->
+<div class="config-overlay" id="configOverlay">
+  <div class="config-box">
+    <h2>⚙️ Configurar ADO Gantt</h2>
+    <p>Los datos se guardan localmente en el navegador. El PAT se necesita para llamar la API de Azure DevOps.</p>
+    <div class="config-row">
+      <div class="config-field">
+        <label>Organization</label>
+        <input type="text" id="cfgOrg" placeholder="ej: mycompany" autocomplete="off" />
+      </div>
+      <div class="config-field">
+        <label>Project</label>
+        <input type="text" id="cfgProject" placeholder="ej: MyProject" autocomplete="off" />
+      </div>
+    </div>
+    <div class="config-field">
+      <label>Team <span style="font-weight:400;text-transform:none">(nombre exacto del equipo en ADO)</span></label>
+      <input type="text" id="cfgTeam" placeholder="ej: MyProject Team" autocomplete="off" />
+      <small>Si no sabés el nombre, dejalo vacío — se intentará con el equipo por defecto.</small>
+    </div>
+    <div class="config-field">
+      <label>Personal Access Token (PAT)</label>
+      <input type="password" id="cfgPat" placeholder="Pegá tu PAT aquí" autocomplete="off" />
+      <small>Permisos necesarios: Work Items (Read), Project and Team (Read).</small>
+    </div>
+    <div class="config-row">
+      <div class="config-field">
+        <label>Ancho de día (px)</label>
+        <input type="number" id="cfgDayW" value="28" min="8" max="120" />
+        <small>Más ancho = más zoom en el timeline.</small>
+      </div>
+      <div class="config-field">
+        <label>Máx. work items</label>
+        <input type="number" id="cfgMax" value="500" min="50" max="2000" />
+      </div>
+    </div>
+    <div class="config-field">
+      <label>Sprints manuales <span style="font-weight:400;text-transform:none">(formato: Nombre,DD/MM/YYYY,DD/MM/YYYY — uno por línea)</span></label>
+      <textarea id="cfgSprints" rows="6" style="width:100%;padding:8px 12px;border:1px solid #ddd;border-radius:6px;font-size:12px;font-family:monospace;resize:vertical"></textarea>
+      <small>Si está completo, se usa en lugar de los sprints de ADO. Borrar para volver a ADO.</small>
+    </div>
+    <button class="config-btn" onclick="saveConfig()">Cargar Gantt →</button>
+  </div>
+</div>
+
+<!-- Top bar -->
+<div class="topbar">
+  <h1>📊 ADO Gantt</h1>
+  <div class="sep"></div>
+  <div class="team-select-wrap">
+    <label>Equipo:</label>
+    <select id="teamSelect" onchange="onTeamChange(this.value)" disabled>
+      <option value="">— cargando equipos —</option>
+    </select>
+  </div>
+  <div class="sep"></div>
+  <div class="filters">
+    <span class="filter-label">Mostrar:</span>
+    <span class="chip on epic"    data-t="Epic"        onclick="toggleChip(this)">👑 Epics</span>
+    <span class="chip on feature" data-t="Feature"     onclick="toggleChip(this)">🔷 Features</span>
+    <span class="chip on story"      data-t="User Story"      onclick="toggleChip(this)">📗 Stories</span>
+    <span class="chip on techTask"   data-t="Technical Task"  onclick="toggleChip(this)">⚙️ Tech Tasks</span>
+    <span class="chip on task"        data-t="Task"         onclick="toggleChip(this)">✅ Tasks</span>
+    <span class="chip on improvement" data-t="Improvement"  onclick="toggleChip(this)">💡 Improvements</span>
+    <span class="chip on bug"     data-t="Bug"          onclick="toggleChip(this)">🐛 Bugs</span>
+  </div>
+  <div class="spacer"></div>
+  <span class="last-update" id="lastUpdate"></span>
+  <button class="btn" onclick="showConfig()">⚙️ Config</button>
+  <button class="btn primary" onclick="loadData()">↻ Actualizar</button>
+</div>
+
+<!-- Page -->
+<div class="page">
+  <div id="mount"></div>
+</div>
+
+<!-- Tooltip -->
+<div class="gtt" id="tooltip"></div>
+
+<script>
+// ─── State ─────────────────────────────────────────────────────────────────────
+let cfg = {};
+let teams = [];         // { id, name }
+let selectedTeam = ''; // team name currently selected
+let iterations = [];   // { id, name, path, startDate, endDate }
+let workItems = [];    // processed items
+let collapsed = new Set();
+let activeTypes = new Set(['Epic','Feature','User Story','Technical Task','Task','Bug','Improvement']);
+let DAY_W = 28;
+let tlStart = null, tlDays = 0;
+
+// ─── Config ────────────────────────────────────────────────────────────────────
+function loadCfg() {
+  try { cfg = JSON.parse(localStorage.getItem('adoGanttCfg2') || '{}'); } catch(e) { cfg = {}; }
+  if (cfg.org && cfg.project && cfg.pat) {
+    document.getElementById('configOverlay').style.display = 'none';
+    loadData();
+  }
+}
+
+function saveConfig() {
+  const org = document.getElementById('cfgOrg').value.trim();
+  const project = document.getElementById('cfgProject').value.trim();
+  const pat = document.getElementById('cfgPat').value.trim();
+  if (!org || !project || !pat) { alert('Organization, Project y PAT son obligatorios.'); return; }
+  cfg = {
+    org, project, pat,
+    team: document.getElementById('cfgTeam').value.trim(),
+    dayW: parseInt(document.getElementById('cfgDayW').value) || 28,
+    maxItems: parseInt(document.getElementById('cfgMax').value) || 500,
+    manualSprints: document.getElementById('cfgSprints').value,
+  };
+  localStorage.setItem('adoGanttCfg2', JSON.stringify(cfg));
+  document.getElementById('configOverlay').style.display = 'none';
+  loadData();
+}
+
+function showConfig() {
+  document.getElementById('cfgOrg').value = cfg.org || '';
+  document.getElementById('cfgProject').value = cfg.project || '';
+  document.getElementById('cfgTeam').value = cfg.team || '';
+  document.getElementById('cfgPat').value = cfg.pat || '';
+  document.getElementById('cfgDayW').value = cfg.dayW || 28;
+  document.getElementById('cfgMax').value = cfg.maxItems || 500;
+  document.getElementById('cfgSprints').value = cfg.manualSprints !== undefined ? cfg.manualSprints : MANUAL_SPRINTS_DEFAULT;
+  document.getElementById('configOverlay').style.display = 'flex';
+}
+
+// ─── ADO helpers ───────────────────────────────────────────────────────────────
+function authHdr() {
+  return { 'Authorization': 'Basic ' + btoa(':' + cfg.pat), 'Content-Type': 'application/json' };
+}
+function base() { return `https://dev.azure.com/${encodeURIComponent(cfg.org)}/${encodeURIComponent(cfg.project)}`; }
+
+async function apiGet(url) {
+  const r = await fetch(url, { headers: authHdr() });
+  if (!r.ok) { const t = await r.text(); throw new Error(`GET ${url}\n→ ${r.status}: ${t.slice(0,300)}`); }
+  return r.json();
+}
+
+// Parsea fechas de ADO ignorando timezone para evitar desfase de días.
+// ADO devuelve "2026-06-05T00:00:00Z" → en UTC-3 sería June 4 21:00, lo cual
+// correría todo un día. Extraemos solo YYYY-MM-DD y creamos fecha local al mediodía.
+function parseAdoDate(str) {
+  if (!str) return null;
+  const m = String(str).match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!m) return new Date(str);
+  return new Date(+m[1], +m[2] - 1, +m[3], 12, 0, 0);
+}
+
+// ─── Fetch teams ───────────────────────────────────────────────────────────────
+async function fetchTeams() {
+  try {
+    const d = await apiGet(`https://dev.azure.com/${encodeURIComponent(cfg.org)}/_apis/projects/${encodeURIComponent(cfg.project)}/teams?$top=100&api-version=7.1`);
+    return (d.value || []).map(t => ({ id: t.id, name: t.name })).sort((a,b) => a.name.localeCompare(b.name));
+  } catch(e) {
+    console.warn('No se pudieron cargar los equipos:', e);
+    return [];
+  }
+}
+
+// Devuelve array de { value, includeChildren } con los area paths del equipo
+async function fetchTeamAreaPaths(teamName) {
+  if (!teamName) return [];
+  try {
+    const d = await apiGet(`${base()}/${encodeURIComponent(teamName)}/_apis/work/teamsettings/teamfieldvalues?api-version=7.1`);
+    return (d.values || []).map(v => ({ value: v.value, includeChildren: v.includeChildren }));
+  } catch(e) {
+    console.warn('No se pudieron obtener area paths del equipo:', e);
+    return [];
+  }
+}
+
+// Construye la cláusula WHERE de area path para el WIQL
+function buildAreaFilter(areaPaths) {
+  if (!areaPaths.length) return '';
+  const clauses = areaPaths.map(ap =>
+    ap.includeChildren
+      ? `[System.AreaPath] UNDER '${ap.value.replace(/'/g, "''")}'`
+      : `[System.AreaPath] = '${ap.value.replace(/'/g, "''")}'`
+  );
+  return `AND (${clauses.join(' OR ')})`;
+}
+
+function populateTeamDropdown() {
+  const sel = document.getElementById('teamSelect');
+  sel.innerHTML = '<option value="">— Todos los sprints —</option>';
+  for (const t of teams) {
+    const opt = document.createElement('option');
+    opt.value = t.name;
+    opt.textContent = t.name;
+    if (t.name === selectedTeam) opt.selected = true;
+    sel.appendChild(opt);
+  }
+  sel.disabled = teams.length === 0;
+}
+
+async function onTeamChange(teamName) {
+  selectedTeam = teamName;
+  const mount = document.getElementById('mount');
+  mount.innerHTML = '<div class="loading"><div class="spinner"></div><span>Cargando datos del equipo…</span></div>';
+  try {
+    // Obtener area paths del equipo seleccionado y recargar todo
+    const areaPaths = await fetchTeamAreaPaths(teamName);
+    currentAreaFilter = buildAreaFilter(areaPaths);
+    const [iters, raw] = await Promise.all([fetchIterations(), fetchWorkItems(currentAreaFilter)]);
+    iterations = iters;
+    lastRaw = raw;
+    workItems = processItems(raw, iters);
+    buildFullTree();
+    const ts = new Date().toLocaleTimeString('es', { hour:'2-digit', minute:'2-digit' });
+    document.getElementById('lastUpdate').textContent = `↻ ${ts} · ${workItems.length} items · ${iters.length} sprints`;
+    render();
+  } catch(e) {
+    mount.innerHTML = `<div class="err"><strong>Error al cargar equipo</strong><br>${esc(e.message)}</div>`;
+  }
+}
+
+// ─── Sprint manual override ────────────────────────────────────────────────────
+const MANUAL_SPRINTS_DEFAULT = `Sprint 1,16/03/2026,27/03/2026
+Sprint 2,30/03/2026,10/04/2026
+Sprint 3,13/04/2026,24/04/2026
+Sprint 4,27/04/2026,08/05/2026
+Sprint 5,11/05/2026,22/05/2026
+Sprint 6,25/05/2026,05/06/2026
+Sprint 7,08/06/2026,19/06/2026
+Sprint 8,22/06/2026,03/07/2026
+Sprint 9,06/07/2026,17/07/2026
+Sprint 10,20/07/2026,31/07/2026
+Sprint 11,03/08/2026,14/08/2026
+Sprint 12,17/08/2026,28/08/2026
+Sprint 13,31/08/2026,11/09/2026
+Sprint 14,14/09/2026,25/09/2026`;
+
+function parseManualSprints(text) {
+  if (!text || !text.trim()) return [];
+  return text.trim().split('\n').map((line, i) => {
+    const parts = line.split(',').map(s => s.trim());
+    if (parts.length < 3) return null;
+    const [name, startStr, endStr] = parts;
+    const parseLocal = s => {
+      const [d, m, y] = s.split('/').map(Number);
+      return new Date(y, m - 1, d, 12, 0, 0);
+    };
+    return { id: `manual-${i}`, name, path: name,
+      startDate: parseLocal(startStr), endDate: parseLocal(endStr) };
+  }).filter(Boolean);
+}
+
+// ─── Fetch iterations ──────────────────────────────────────────────────────────
+async function fetchIterations() {
+  // 0. Si hay sprints manuales configurados, usarlos directamente
+  const manualText = cfg.manualSprints !== undefined ? cfg.manualSprints : MANUAL_SPRINTS_DEFAULT;
+  if (manualText && manualText.trim()) {
+    const manual = parseManualSprints(manualText);
+    if (manual.length) return manual;
+  }
+
+  // 1. Try selected team or config team
+  const teamCandidates = [];
+  if (selectedTeam) teamCandidates.push(selectedTeam);
+  else if (cfg.team) teamCandidates.push(cfg.team);
+  // Always try project default team as fallback
+  teamCandidates.push(cfg.project + ' Team', cfg.project);
+
+  for (const team of teamCandidates) {
+    try {
+      const url = `${base()}/${encodeURIComponent(team)}/_apis/work/teamsettings/iterations?api-version=7.1`;
+      const d = await apiGet(url);
+      if (d.value?.length) {
+        const iters = d.value
+          .filter(i => i.attributes?.startDate && i.attributes?.finishDate)
+          .map(i => ({
+            id: i.id, name: i.name, path: i.path,
+            startDate: parseAdoDate(i.attributes.startDate),
+            endDate: parseAdoDate(i.attributes.finishDate),
+          }))
+          .sort((a,b) => a.startDate - b.startDate);
+        if (iters.length) return iters;
+      }
+    } catch(e) { /* try next */ }
+  }
+
+  // 2. Fallback: classification nodes
+  try {
+    const d = await apiGet(`${base()}/_apis/wit/classificationnodes/iterations?$depth=10&api-version=7.1`);
+    const flat = [];
+    function walk(node) {
+      if (node.attributes?.startDate && node.attributes?.finishDate) {
+        flat.push({ id: node.id, name: node.name, path: node.path,
+          startDate: parseAdoDate(node.attributes.startDate),
+          endDate: parseAdoDate(node.attributes.finishDate) });
+      }
+      (node.children || []).forEach(walk);
+    }
+    walk(d);
+    if (flat.length) return flat.sort((a,b) => a.startDate - b.startDate);
+  } catch(e) { /* ignore */ }
+
+  return [];
+}
+
+// ─── Fetch work items ──────────────────────────────────────────────────────────
+let lastRaw = []; // cache para no re-fetchear al cambiar solo el equipo/sprint
+let currentAreaFilter = ''; // cláusula WHERE de area path activa
+
+async function fetchWorkItems(areaFilter = '') {
+  const maxItems = cfg.maxItems || 500;
+  const wiql = { query: `SELECT [System.Id] FROM WorkItems WHERE [System.TeamProject] = @project AND [System.WorkItemType] IN ('Epic','Feature','User Story','Technical Task','Task','Bug','Improvement') AND [System.State] NOT IN ('Removed','Cut','Cancelled','Rejected','Withdrawn') ${areaFilter} ORDER BY [System.WorkItemType] ASC, [System.Id] ASC` };
+  const r = await fetch(`${base()}/_apis/wit/wiql?$top=${maxItems}&api-version=7.1`, {
+    method: 'POST', headers: authHdr(), body: JSON.stringify(wiql)
+  });
+  if (!r.ok) throw new Error(`WIQL query falló: ${r.status} ${await r.text()}`);
+  const { workItems: wis } = await r.json();
+  if (!wis?.length) return [];
+
+  const ids = wis.map(w => w.id);
+  const fields = [
+    'System.Id','System.Title','System.WorkItemType','System.State',
+    'System.IterationPath','System.Parent','System.AssignedTo',
+    'Microsoft.VSTS.Scheduling.StartDate','Microsoft.VSTS.Scheduling.FinishDate',
+    'Microsoft.VSTS.Scheduling.TargetDate',
+    'Microsoft.VSTS.Scheduling.CompletedWork','Microsoft.VSTS.Scheduling.RemainingWork',
+    'Microsoft.VSTS.Scheduling.OriginalEstimate','Microsoft.VSTS.Common.Priority',
+  ].join(',');
+
+  const raw = [];
+  for (let i = 0; i < ids.length; i += 200) {
+    const chunk = ids.slice(i, i+200);
+    const d = await apiGet(`${base()}/_apis/wit/workitems?ids=${chunk.join(',')}&fields=${encodeURIComponent(fields)}&api-version=7.1`);
+    raw.push(...(d.value || []));
+  }
+  return raw;
+}
+
+// ─── Process ───────────────────────────────────────────────────────────────────
+function processItems(raw, iters) {
+  // Lista única de iteraciones para búsqueda
+  const uniqueIters = iters.filter((v,i,a) => a.findIndex(x => x.id === v.id) === i);
+
+  // Índice por path completo y por último segmento
+  const iterByPath = {};
+  for (const it of uniqueIters) {
+    iterByPath[it.path.toLowerCase()] = it;
+    const seg = it.path.replace(/\\/g, '/').split('/').pop();
+    if (!iterByPath[seg.toLowerCase()]) iterByPath[seg.toLowerCase()] = it;
+  }
+
+  function findIter(iterPath) {
+    if (!iterPath) return null;
+    const pathClean = iterPath.toLowerCase().replace(/\.+$/, '').trim();
+
+    // 1. Exact full path
+    if (iterByPath[pathClean]) return iterByPath[pathClean];
+
+    // 2. Cada segmento separado por \ o /
+    const segments = pathClean.replace(/\\/g, '/').split('/');
+    for (let i = segments.length - 1; i >= 0; i--) {
+      const seg = segments[i].replace(/\.+$/, '').trim();
+      if (!seg) continue;
+
+      // Exact segment match
+      if (iterByPath[seg]) return iterByPath[seg];
+
+      // Match por número: extrae dígitos de "sprint 5 - evolutivo" → 5
+      const nm = seg.match(/sprint[^\d]*(\d+)/i);
+      if (nm) {
+        const num = parseInt(nm[1]);
+        const found = uniqueIters.find(v => {
+          const km = v.name.match(/sprint[^\d]*(\d+)/i);
+          return km && parseInt(km[1]) === num;
+        });
+        if (found) return found;
+      }
+    }
+
+    // 3. El path completo contiene el nombre exacto del sprint
+    for (const it of uniqueIters) {
+      if (pathClean.includes(it.name.toLowerCase())) return it;
+    }
+
+    console.warn('findIter: no match para', iterPath, '| keys:', Object.keys(iterByPath).slice(0,5));
+    return null;
+  }
+
+  return raw.map(item => {
+    const f = item.fields || {};
+    const type = f['System.WorkItemType'];
+    const iter = findIter(f['System.IterationPath']);
+
+    let startDate, endDate;
+
+    if (type === 'Epic' || type === 'Feature') {
+      // Epics y Features: usar StartDate y TargetDate explícitos
+      startDate = parseAdoDate(f['Microsoft.VSTS.Scheduling.StartDate']);
+      endDate   = parseAdoDate(f['Microsoft.VSTS.Scheduling.TargetDate'] || f['Microsoft.VSTS.Scheduling.FinishDate']);
+      // Si no tienen fechas explícitas, caer al sprint
+      if (!startDate && iter) startDate = iter.startDate;
+      if (!endDate   && iter) endDate   = iter.endDate;
+    } else {
+      // User Stories, Technical Tasks, Tasks, Bugs: fechas del sprint asignado
+      startDate = iter ? iter.startDate : null;
+      endDate   = iter ? iter.endDate   : null;
+    }
+
+    // Progreso basado en estado (se recalcula bottom-up en buildFullTree)
+    let progress = stateToProgress(f['System.State'] || '');
+
+    const assignee = f['System.AssignedTo'];
+    return {
+      id: item.id, title: f['System.Title'] || '(sin título)', type,
+      state: f['System.State'] || 'New',
+      iterPath: f['System.IterationPath'] || '',
+      parentId: f['System.Parent'] || null,
+      startDate, endDate, progress, iter,
+      assignee: assignee?.displayName || '',
+      priority: f['Microsoft.VSTS.Common.Priority'] || 0,
+      children: [],
+    };
+  });
+}
+
+// Orden de tipos para ordenar raíces cuando no hay parent explícito
+const TYPE_ORDER = { 'Epic': 0, 'Feature': 1, 'User Story': 2, 'Technical Task': 2, 'Improvement': 2, 'Task': 3, 'Bug': 4 };
+
+// Progreso basado en estado del item
+function stateToProgress(state) {
+  const s = (state || '').toLowerCase();
+  if (['done','closed','resolved','completed','inactive'].some(x => s.includes(x))) return 100;
+  if (['active','in progress','committed','in review','code review','in-progress'].some(x => s.includes(x))) return 50;
+  return 0;
+}
+
+// Calcula progreso bottom-up: promedio del progreso de los hijos directos
+function calcProgress(node) {
+  if (!node.children || node.children.length === 0) return node.progress;
+  const childProgs = node.children.map(c => calcProgress(c));
+  return Math.round(childProgs.reduce((a, b) => a + b, 0) / childProgs.length);
+}
+
+let fullTree = []; // árbol completo, reconstruido solo cuando cambian los datos
+
+function buildFullTree() {
+  const map = {};
+  for (const it of workItems) { it.children = []; map[it.id] = it; }
+  const roots = [];
+  for (const it of workItems) {
+    if (it.parentId && map[it.parentId]) {
+      map[it.parentId].children.push(it);
+    } else {
+      roots.push(it);
+    }
+  }
+  // Ordenar cada nivel por tipo y luego por id
+  function sortLevel(nodes) {
+    nodes.sort((a,b) => (TYPE_ORDER[a.type]??9) - (TYPE_ORDER[b.type]??9) || a.title.localeCompare(b.title, 'es', { numeric: true }));
+    for (const n of nodes) sortLevel(n.children);
+  }
+  sortLevel(roots);
+  fullTree = roots;
+
+  // Calcular progreso bottom-up (desde hijos hacia padres)
+  for (const root of fullTree) {
+    root.progress = calcProgress(root);
+    function applyProgress(node) {
+      for (const child of node.children) {
+        child.progress = calcProgress(child);
+        applyProgress(child);
+      }
+    }
+    applyProgress(root);
+  }
+
+  // Colapsar todo al (re)cargar datos
+  collapsed.clear();
+  function collapseAll(nodes) {
+    for (const n of nodes) {
+      if (n.children.length > 0) collapsed.add(n.id);
+      collapseAll(n.children);
+    }
+  }
+  collapseAll(fullTree);
+}
+
+// Flatten con soporte de filtro por tipo:
+// - Nodo visible + no colapsado → aparece y se recursa en hijos (depth+1)
+// - Nodo visible + colapsado    → aparece, NO se recursa
+// - Nodo oculto (tipo filtrado) → no aparece, pero SÍ se recursa en hijos al mismo depth (pass-through)
+function flatten(nodes, depth = 0) {
+  const out = [];
+  for (const n of nodes) {
+    const show = activeTypes.has(n.type);
+    // Contar hijos visibles (para saber si mostrar botón de colapsar)
+    const hasVisibleKids = n.children.length > 0;
+    if (show) {
+      out.push({ ...n, depth, hasVisibleKids });
+    }
+    if (show && collapsed.has(n.id)) continue; // colapsado: no recursar
+    if (n.children.length) {
+      out.push(...flatten(n.children, show ? depth + 1 : depth));
+    }
+  }
+  return out;
+}
+
+// ─── Render helpers ────────────────────────────────────────────────────────────
+function doff(d) { return d ? Math.round((d - tlStart) / 86400000) : -9999; }
+function px(d)   { return d * DAY_W; }
+
+function fmtD(d) {
+  if (!d) return '?';
+  return d.toLocaleDateString('es', { day:'2-digit', month:'2-digit', year:'2-digit' });
+}
+
+function esc(s) {
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function statusCls(s) {
+  const l = (s||'').toLowerCase();
+  if (['done','closed','resolved','completed'].some(x => l.includes(x))) return 's-done';
+  if (['active','in progress','committed','in-progress'].some(x => l.includes(x))) return 's-active';
+  if (['removed'].some(x => l.includes(x))) return 's-removed';
+  if (['resolved'].some(x => l.includes(x))) return 's-resolved';
+  return 's-new';
+}
+
+function typeIcon(t) {
+  return { Epic:'👑', Feature:'🔷', 'User Story':'📗', 'Technical Task':'⚙️', 'Improvement':'💡', Task:'✅', Bug:'🐛' }[t] || '📄';
+}
+function barCls(t) {
+  return { Epic:'b-epic', Feature:'b-feature', 'User Story':'b-story', 'Technical Task':'b-techtask', 'Improvement':'b-improvement', Task:'b-task', Bug:'b-bug' }[t] || 'b-task';
+}
+function pfCls(t) {
+  return { Epic:'pf-epic', Feature:'pf-feature', 'User Story':'pf-story', 'Technical Task':'pf-techtask', 'Improvement':'pf-improvement', Task:'pf-task', Bug:'pf-bug' }[t] || 'pf-task';
+}
+
+// ─── Main render ───────────────────────────────────────────────────────────────
+function render() {
+  const mount = document.getElementById('mount');
+  DAY_W = cfg.dayW || 28;
+
+  const validIters = iterations.filter(i => i.startDate && i.endDate);
+  if (!validIters.length) {
+    mount.innerHTML = '<div class="err"><strong>Sin sprints</strong>No se encontraron iteraciones con fechas. Verificá el nombre del equipo en ⚙️ Config.</div>';
+    return;
+  }
+
+  // Timeline bounds: from first sprint start to last sprint end + padding
+  const tStart = new Date(Math.min(...validIters.map(i => i.startDate)));
+  const tEnd   = new Date(Math.max(...validIters.map(i => i.endDate)));
+  tStart.setDate(tStart.getDate() - 2);
+  tEnd.setDate(tEnd.getDate() + 7);
+  tlStart = tStart;
+  tlDays = Math.ceil((tEnd - tStart) / 86400000);
+  const totalW = px(tlDays);
+
+  const rows = flatten(fullTree);
+  if (!rows.length) {
+    mount.innerHTML = '<div class="empty">No hay items con los filtros actuales.</div>';
+    return;
+  }
+
+  const today = new Date(); today.setHours(0,0,0,0);
+  const todayOff = doff(today);
+
+  // Left panel width = name col + fixed cols
+  const LW = nameColW + 95 + 72 + 145;
+
+  // ── Months row ──────────────────────────────────────────────────────────────
+  let monthsHtml = '';
+  {
+    let cur = new Date(tStart.getFullYear(), tStart.getMonth(), 1);
+    while (cur <= tEnd) {
+      const mStart = new Date(Math.max(cur, tStart));
+      const mEnd   = new Date(Math.min(new Date(cur.getFullYear(), cur.getMonth()+1, 0), tEnd));
+      const days   = Math.round((mEnd - mStart) / 86400000) + 1;
+      const w      = px(days);
+      const lbl    = mStart.toLocaleString('es', { month:'long', year:'numeric' });
+      monthsHtml  += `<div class="month-cell" style="min-width:${w}px;width:${w}px">${lbl}</div>`;
+      cur = new Date(cur.getFullYear(), cur.getMonth()+1, 1);
+    }
+  }
+
+  // ── Sprints row ─────────────────────────────────────────────────────────────
+  // Cada celda se posiciona usando el offset real en días desde tlStart,
+  // igual que las barras → garantiza alineación perfecta incluyendo gaps entre sprints.
+  let sprintsHtml = '';
+  for (const it of validIters) {
+    const left = px(doff(it.startDate));
+    const days = Math.round((it.endDate - it.startDate) / 86400000) + 1;
+    const w    = Math.max(px(days), 4);
+    const isCur  = today >= it.startDate && today <= it.endDate;
+    const isPast = it.endDate < today;
+    const cls = isCur ? 'current' : isPast ? 'past' : '';
+    const tip = `${esc(it.name)}: ${fmtD(it.startDate)} – ${fmtD(it.endDate)}`;
+    sprintsHtml += `<div class="sprint-cell ${cls}" style="position:absolute;left:${left}px;width:${w}px" title="${tip}">
+      ${esc(it.name)}<span style="font-weight:400;font-size:10px;margin-left:4px;opacity:0.8">(${fmtD(it.startDate)} – ${fmtD(it.endDate)})</span>
+    </div>`;
+  }
+
+  // ── Sprint background bands + dividers ──────────────────────────────────────
+  let sprintBgHtml = '';
+  for (let i = 0; i < validIters.length; i++) {
+    const it = validIters[i];
+    const left = px(doff(it.startDate));
+    const days = Math.round((it.endDate - it.startDate) / 86400000) + 1;
+    const w = px(days);
+    sprintBgHtml += `<div class="sprint-bg${i%2===1?' even':''}" style="left:${left}px;width:${w}px"></div>`;
+    sprintBgHtml += `<div class="sprint-divider" style="left:${left}px"></div>`;
+  }
+
+  const todayLine = '';
+
+  // ── Row HTML ────────────────────────────────────────────────────────────────
+  let leftRows = '', rightRows = '';
+  for (const item of rows) {
+    const pad = item.depth * 16 + 6;
+    const hasKids = item.hasVisibleKids;
+    const isCol = collapsed.has(item.id);
+    const cbtn = hasKids
+      ? `<button class="cbtn" onclick="toggleCol(${item.id})">${isCol ? '▶' : '▼'}</button>`
+      : '<span style="width:14px;flex-shrink:0;display:inline-block"></span>';
+
+    const tipText = `${item.type} #${item.id}\n${item.title}\nEstado: ${item.state}\nIterPath: ${item.iterPath}\nSprint: ${item.iter ? item.iter.name : '(no mapeado)'}\nAsignado: ${item.assignee||'—'}\nProgreso: ${item.progress}%`;
+
+    leftRows += `
+      <div class="l-row" data-id="${item.id}">
+        <div class="l-cell" style="padding-left:${pad}px">
+          <div class="item-name">
+            ${cbtn}
+            <span class="iicon">${typeIcon(item.type)}</span>
+            <span class="ititle" title="${esc(item.title)}">${esc(item.title)}</span>
+          </div>
+        </div>
+        <div class="l-cell"><span class="sbadge ${statusCls(item.state)}">${esc(item.state)}</span></div>
+        <div class="l-cell">
+          <div class="pbar-wrap">
+            <div class="pbar-pct">${item.progress}%</div>
+            <div class="pbar"><div class="pbar-fill ${pfCls(item.type)}" style="width:${item.progress}%"></div></div>
+          </div>
+        </div>
+        <div class="l-cell" style="font-size:11px;color:#777">${fmtD(item.startDate)} – ${fmtD(item.endDate)}</div>
+      </div>`;
+
+    // Bar
+    let barHtml = '';
+    if (item.startDate && item.endDate) {
+      const left = px(doff(item.startDate));
+      const barDays = Math.max(doff(item.endDate) - doff(item.startDate) + 1, 1);
+      const w = Math.max(px(barDays), 6);
+      const progW = w * item.progress / 100;
+      const dashedStyle = item.hasExplicitDates ? '' : 'opacity:0.75;';
+      barHtml = `<div class="gbar ${barCls(item.type)}" style="left:${left}px;width:${w}px;${dashedStyle}"
+        onmouseenter="showTip(event,'${esc(tipText).replace(/\n/g,'&#10;')}')" onmouseleave="hideTip()">
+        <div class="gbar-prog" style="width:${progW}px"></div>
+        <span class="gbar-lbl">${esc(item.title)}</span>
+      </div>`;
+    } else if (item.iter) {
+      const left = px(doff(item.iter.startDate));
+      const days = Math.max(doff(item.iter.endDate) - doff(item.iter.startDate) + 1, 1);
+      const w = Math.max(px(days), 6);
+      barHtml = `<div class="gbar-dash" style="left:${left}px;width:${w}px"
+        onmouseenter="showTip(event,'${esc(tipText).replace(/\n/g,'&#10;')}')" onmouseleave="hideTip()">
+        <span class="gbar-lbl">${esc(item.title)}</span>
+      </div>`;
+    }
+
+    rightRows += `<div class="t-row" style="width:${totalW}px">${barHtml}</div>`;
+  }
+
+  mount.innerHTML = `
+    <div class="gantt-card">
+      <div class="gantt-inner">
+        <div class="g-left" style="width:${LW}px">
+          <div class="lh">
+            <div class="lh-cell">Nombre<div class="col-resize" id="nameResizeHandle"></div></div>
+            <div class="lh-cell">Estado</div>
+            <div class="lh-cell">Progreso</div>
+            <div class="lh-cell">Período</div>
+          </div>
+          <div class="g-body" id="leftBody">${leftRows}</div>
+        </div>
+        <div class="g-right" id="tlScroll">
+          <div class="th" style="width:${totalW}px">
+            <div class="sprints-row">${sprintsHtml}</div>
+          </div>
+          <div style="position:relative;width:${totalW}px">
+            ${sprintBgHtml}
+            ${todayLine}
+            <div id="rightBody">${rightRows}</div>
+          </div>
+        </div>
+      </div>
+    </div>`;
+
+  // Sync vertical scroll
+  const tl = document.getElementById('tlScroll');
+  const lb = document.getElementById('leftBody');
+  const rb = document.getElementById('rightBody');
+  tl.addEventListener('scroll', () => { lb.style.marginTop = `-${tl.scrollTop}px`; });
+
+  // Solo auto-scroll en carga inicial, no al colapsar/expandir
+  if (!render.skipScroll) {
+    const curIter = validIters.find(i => today >= i.startDate && today <= i.endDate);
+    if (curIter) {
+      tl.scrollLeft = Math.max(0, px(doff(curIter.startDate)) - 60);
+    } else if (todayOff > 0) {
+      tl.scrollLeft = Math.max(0, px(todayOff) - 300);
+    }
+  }
+  render.skipScroll = false;
+
+  // Activar resize handle
+  initResizeHandle();
+}
+
+// ─── Tooltip ──────────────────────────────────────────────────────────────────
+function showTip(e, text) {
+  const t = document.getElementById('tooltip');
+  t.innerHTML = text.replace(/&#10;/g,'<br>');
+  t.style.display = 'block';
+  moveTip(e);
+}
+function moveTip(e) {
+  const t = document.getElementById('tooltip');
+  t.style.left = (e.clientX + 14) + 'px';
+  t.style.top  = (e.clientY - 10) + 'px';
+}
+function hideTip() { document.getElementById('tooltip').style.display = 'none'; }
+document.addEventListener('mousemove', e => { if (document.getElementById('tooltip').style.display !== 'none') moveTip(e); });
+
+// ─── Column resize ────────────────────────────────────────────────────────────
+let nameColW = 220;
+
+function initResizeHandle() {
+  const handle = document.getElementById('nameResizeHandle');
+  if (!handle) return;
+  let startX, startW;
+  handle.addEventListener('mousedown', e => {
+    startX = e.clientX;
+    startW = nameColW;
+    handle.classList.add('dragging');
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+
+    const onMove = e => {
+      const w = Math.max(120, Math.min(600, startW + e.clientX - startX));
+      nameColW = w;
+      document.documentElement.style.setProperty('--name-col', w + 'px');
+      const gLeft = document.querySelector('.g-left');
+      if (gLeft) gLeft.style.width = (w + 95 + 72 + 145) + 'px';
+    };
+    const onUp = () => {
+      handle.classList.remove('dragging');
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+    };
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+    e.preventDefault();
+  });
+}
+
+// ─── Actions ──────────────────────────────────────────────────────────────────
+function toggleCol(id) {
+  const tl = document.getElementById('tlScroll');
+  const savedScroll = tl ? tl.scrollLeft : null;
+
+  if (collapsed.has(id)) collapsed.delete(id); else collapsed.add(id);
+  render.skipScroll = true;
+  render();
+  initResizeHandle();
+
+  // Restaurar scroll
+  if (savedScroll !== null) {
+    const tlNew = document.getElementById('tlScroll');
+    if (tlNew) tlNew.scrollLeft = savedScroll;
+  }
+}
+
+function toggleChip(el) {
+  const t = el.dataset.t;
+  if (activeTypes.has(t)) { activeTypes.delete(t); el.classList.remove('on'); }
+  else { activeTypes.add(t); el.classList.add('on'); }
+  render();
+}
+
+// ─── Load ─────────────────────────────────────────────────────────────────────
+async function loadData() {
+  const mount = document.getElementById('mount');
+  mount.innerHTML = '<div class="loading"><div class="spinner"></div><span>Cargando datos de Azure DevOps…</span></div>';
+  document.getElementById('lastUpdate').textContent = '';
+
+  try {
+    // Primero obtener teams y area paths del equipo inicial
+    const [fetchedTeams, areaPaths] = await Promise.all([
+      fetchTeams(),
+      fetchTeamAreaPaths(selectedTeam || cfg.team || ''),
+    ]);
+    currentAreaFilter = buildAreaFilter(areaPaths);
+
+    // Luego iteraciones y work items con el filtro aplicado
+    const [iters, raw] = await Promise.all([
+      fetchIterations(),
+      fetchWorkItems(currentAreaFilter),
+    ]);
+
+    teams      = fetchedTeams;
+    iterations = iters;
+    lastRaw    = raw;
+    workItems  = processItems(raw, iters);
+    buildFullTree();
+
+    // Populate team dropdown
+    populateTeamDropdown();
+
+    const ts = new Date().toLocaleTimeString('es', { hour:'2-digit', minute:'2-digit' });
+    document.getElementById('lastUpdate').textContent = `↻ ${ts} · ${workItems.length} items · ${iters.length} sprints`;
+    render();
+  } catch(err) {
+    console.error(err);
+    mount.innerHTML = `<div class="err">
+      <strong>Error al conectar con Azure DevOps</strong>
+      ${esc(err.message)}<br><br>
+      <b>Verificá:</b>
+      <ul style="margin-top:6px;padding-left:18px;line-height:1.8">
+        <li>Organización y proyecto correctos en ⚙️ Config</li>
+        <li>PAT con permisos <em>Work Items (Read)</em> y <em>Project and Team (Read)</em></li>
+        <li>Consola del navegador (F12) para ver el error detallado</li>
+      </ul>
+    </div>`;
+  }
+}
+
+// ─── Init ─────────────────────────────────────────────────────────────────────
+loadCfg();
+</script>
+</body>
+</html>

@@ -1,0 +1,2880 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ProBatch — Design System Unificado</title>
+  <style>
+    /* ============================================================
+       DESIGN TOKENS
+    ============================================================ */
+    :root {
+      /* Brand */
+      --brand-primary:   #1A3A5C;
+      --brand-secondary: #0D6EFD;
+      --brand-accent:    #F59E0B;
+
+      /* Neutrals */
+      --gray-50:  #F8FAFC;
+      --gray-100: #F1F5F9;
+      --gray-200: #E2E8F0;
+      --gray-300: #CBD5E1;
+      --gray-400: #94A3B8;
+      --gray-500: #64748B;
+      --gray-600: #475569;
+      --gray-700: #334155;
+      --gray-800: #1E293B;
+      --gray-900: #0F172A;
+
+      /* Semantic States */
+      --status-success:  #22C55E;
+      --status-error:    #EF4444;
+      --status-warning:  #F59E0B;
+      --status-info:     #3B82F6;
+      --status-pending:  #A78BFA;
+      --status-blocked:  #94A3B8;
+      --status-running:  #0EA5E9;
+
+      /* Surfaces */
+      --surface-app:     #F1F5F9;
+      --surface-sidebar: #1A3A5C;
+      --surface-card:    #FFFFFF;
+      --surface-header:  #1A3A5C;
+
+      /* Text */
+      --text-primary:   #1E293B;
+      --text-secondary: #64748B;
+      --text-inverse:   #FFFFFF;
+      --text-muted:     #94A3B8;
+
+      /* Spacing */
+      --sp-1: 4px;  --sp-2: 8px;  --sp-3: 12px;
+      --sp-4: 16px; --sp-5: 20px; --sp-6: 24px;
+      --sp-8: 32px; --sp-10: 40px;
+
+      /* Radius */
+      --radius-sm: 4px; --radius-md: 8px; --radius-lg: 12px;
+
+      /* Shadow */
+      --shadow-sm: 0 1px 3px rgba(0,0,0,.08);
+      --shadow-md: 0 4px 12px rgba(0,0,0,.10);
+      --shadow-lg: 0 8px 24px rgba(0,0,0,.12);
+
+      /* Sidebar width */
+      --sidebar-w: 64px;
+      --flyout-w: 210px;
+      --header-h: 48px;
+    }
+
+    /* ============================================================
+       RESET & BASE
+    ============================================================ */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Segoe UI', system-ui, sans-serif; font-size: 14px;
+           color: var(--text-primary); background: var(--surface-app); height: 100vh;
+           display: flex; flex-direction: column; overflow: hidden; }
+    button { cursor: pointer; font-family: inherit; }
+    a { text-decoration: none; color: inherit; }
+
+    /* ============================================================
+       LAYOUT
+    ============================================================ */
+    .app-header {
+      height: var(--header-h);
+      background: var(--surface-header);
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0 var(--sp-4);
+      z-index: 100;
+      flex-shrink: 0;
+    }
+    .app-body {
+      display: flex;
+      flex: 1;
+      overflow: hidden;
+    }
+    .sidebar {
+      display: flex; flex-direction: row;
+      flex-shrink: 0;
+      overflow: visible;
+    }
+    .main-content {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .content-area {
+      flex: 1;
+      overflow-y: auto;
+      padding: var(--sp-6);
+    }
+    .notification-panel {
+      width: 280px;
+      background: var(--surface-card);
+      border-left: 1px solid var(--gray-200);
+      flex-shrink: 0;
+      display: flex; flex-direction: column;
+      overflow: hidden;
+      transition: width .2s;
+    }
+    .notification-panel.collapsed { width: 0; overflow: hidden; }
+
+    /* ============================================================
+       DETAIL PANEL (slide-in derecha)
+    ============================================================ */
+    .detail-panel {
+      position: fixed;
+      top: var(--header-h);
+      right: 0;
+      width: 520px;
+      height: calc(100vh - var(--header-h));
+      background: var(--surface-card);
+      border-left: 1px solid var(--gray-200);
+      box-shadow: -4px 0 24px rgba(0,0,0,.10);
+      display: flex; flex-direction: column;
+      z-index: 100;
+      transform: translateX(100%);
+      transition: transform .22s ease;
+    }
+    .detail-panel.open { transform: translateX(0); }
+
+    .detail-panel-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      top: var(--header-h);
+      background: rgba(0,0,0,.25);
+      z-index: 99;
+    }
+    .detail-panel-overlay.open { display: block; }
+
+    .dp-header {
+      padding: var(--sp-3) var(--sp-4);
+      border-bottom: 1px solid var(--gray-200);
+      display: flex; flex-direction: column; gap: var(--sp-2);
+      flex-shrink: 0;
+    }
+    .dp-breadcrumb {
+      display: flex; align-items: center; gap: var(--sp-2);
+      font-size: 12px; color: var(--text-secondary);
+    }
+    .dp-breadcrumb-item {
+      cursor: pointer; color: var(--brand-secondary);
+    }
+    .dp-breadcrumb-item:hover { text-decoration: underline; }
+    .dp-breadcrumb-sep { color: var(--gray-300); }
+    .dp-breadcrumb-current { color: var(--text-primary); font-weight: 500; }
+
+    .dp-title-row {
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .dp-title { font-size: 15px; font-weight: 600; color: var(--text-primary); }
+    .dp-close {
+      background: none; border: none; font-size: 18px; cursor: pointer;
+      color: var(--text-secondary); padding: 2px 6px; border-radius: 4px;
+    }
+    .dp-close:hover { background: var(--gray-100); color: var(--text-primary); }
+
+    .dp-actions {
+      display: flex; gap: var(--sp-2); padding: var(--sp-2) var(--sp-4);
+      border-bottom: 1px solid var(--gray-200); flex-shrink: 0;
+    }
+
+    .dp-body { flex: 1; overflow-y: auto; padding: var(--sp-4); }
+
+    /* Instance cards dentro del panel */
+    .inst-card {
+      border: 1px solid var(--gray-200); border-radius: var(--radius-md);
+      padding: var(--sp-3) var(--sp-4); margin-bottom: var(--sp-3);
+      cursor: pointer; transition: all .12s;
+      display: flex; align-items: center; justify-content: space-between;
+      background: var(--surface-app);
+    }
+    .inst-card:hover { border-color: var(--brand-secondary); background: #f0f6ff; }
+    .inst-card-left { display: flex; flex-direction: column; gap: 4px; }
+    .inst-card-name { font-weight: 600; font-size: 13px; }
+    .inst-card-meta { font-size: 11px; color: var(--text-secondary); }
+    .inst-card-right { display: flex; align-items: center; gap: var(--sp-3); }
+    .inst-counters { display: flex; gap: var(--sp-2); }
+    .inst-counter { text-align: center; }
+    .inst-counter-val { font-size: 14px; font-weight: 700; }
+    .inst-counter-lbl { font-size: 10px; color: var(--text-secondary); }
+
+    /* Command rows */
+    .cmd-row {
+      border: 1px solid var(--gray-200); border-radius: var(--radius-md);
+      padding: var(--sp-3) var(--sp-4); margin-bottom: var(--sp-2);
+      cursor: pointer; transition: all .12s;
+      display: flex; align-items: center; gap: var(--sp-3);
+      background: var(--surface-app);
+    }
+    .cmd-row:hover { border-color: var(--brand-secondary); background: #f0f6ff; }
+    .cmd-status-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+    .cmd-info { flex: 1; }
+    .cmd-name { font-weight: 600; font-size: 13px; }
+    .cmd-meta { font-size: 11px; color: var(--text-secondary); margin-top: 2px; }
+    .cmd-duration { font-size: 12px; color: var(--text-secondary); }
+    .cmd-progress-bar {
+      height: 4px; background: var(--gray-200); border-radius: 2px;
+      margin-top: 6px; overflow: hidden;
+    }
+    .cmd-progress-fill { height: 100%; border-radius: 2px; background: var(--brand-secondary); }
+
+    /* Detail view */
+    .detail-section { margin-bottom: var(--sp-5); }
+    .detail-section-title {
+      font-size: 11px; font-weight: 600; letter-spacing: .06em;
+      text-transform: uppercase; color: var(--text-secondary);
+      margin-bottom: var(--sp-3);
+    }
+    .detail-kv { display: grid; grid-template-columns: 140px 1fr; gap: var(--sp-2) var(--sp-3); }
+    .detail-key { font-size: 12px; color: var(--text-secondary); }
+    .detail-val { font-size: 12px; color: var(--text-primary); font-weight: 500; }
+    .detail-log {
+      background: #1e1e2e; color: #cdd6f4; font-size: 11px; font-family: monospace;
+      border-radius: var(--radius-md); padding: var(--sp-3); line-height: 1.6;
+      max-height: 180px; overflow-y: auto;
+    }
+    .log-line-error { color: #f38ba8; }
+    .log-line-ok { color: #a6e3a1; }
+    .log-line-info { color: #89b4fa; }
+
+    /* ============================================================
+       HEADER
+    ============================================================ */
+    .header-brand {
+      display: flex; align-items: center; gap: var(--sp-3);
+    }
+    .header-logo {
+      width: 32px; height: 32px; background: var(--brand-accent);
+      border-radius: var(--radius-sm);
+      display: flex; align-items: center; justify-content: center;
+      font-weight: 700; font-size: 13px; color: var(--gray-900);
+    }
+    .header-title { color: var(--text-inverse); font-weight: 600; font-size: 15px; }
+    .header-env {
+      color: var(--brand-accent);
+      font-size: 11px; font-weight: 500;
+      background: rgba(245,158,11,.15);
+      padding: 2px 8px; border-radius: 20px;
+      margin-left: var(--sp-2);
+    }
+    .header-actions { display: flex; align-items: center; gap: var(--sp-2); }
+    .header-btn {
+      width: 32px; height: 32px; background: rgba(255,255,255,.1);
+      border: none; border-radius: var(--radius-sm);
+      color: var(--text-inverse); font-size: 16px;
+      display: flex; align-items: center; justify-content: center;
+      transition: background .15s;
+      position: relative;
+    }
+    .header-btn:hover { background: rgba(255,255,255,.2); }
+    .header-badge {
+      position: absolute; top: 2px; right: 2px;
+      width: 14px; height: 14px; background: var(--status-error);
+      border-radius: 50%; font-size: 9px; color: #fff;
+      display: flex; align-items: center; justify-content: center;
+      font-weight: 700;
+    }
+    .header-user {
+      display: flex; align-items: center; gap: var(--sp-2);
+      color: var(--text-inverse); font-size: 13px;
+      padding: 4px 8px; border-radius: var(--radius-sm);
+      background: rgba(255,255,255,.1);
+      position: relative; cursor: pointer;
+    }
+    .header-user:hover { background: rgba(255,255,255,.18); }
+    .avatar {
+      width: 26px; height: 26px; background: var(--brand-accent);
+      border-radius: 50%; display: flex; align-items: center; justify-content: center;
+      font-size: 11px; font-weight: 700; color: var(--gray-900);
+    }
+
+    /* Role switcher dropdown */
+    .role-dropdown {
+      position: fixed;
+      background: #fff; border: 1px solid var(--gray-200);
+      border-radius: var(--radius-md); box-shadow: var(--shadow-lg);
+      width: 240px; z-index: 9999;
+      display: none;
+      overflow: hidden;
+    }
+    .role-dropdown.open { display: block; }
+    .role-dropdown-header {
+      padding: 10px 14px 6px;
+      font-size: 10px; font-weight: 700; letter-spacing: .08em;
+      text-transform: uppercase; color: var(--gray-400);
+      border-bottom: 1px solid var(--gray-100);
+    }
+    .role-item {
+      display: flex; align-items: center; gap: 10px;
+      padding: 9px 14px; cursor: pointer;
+      transition: background .12s; border-left: 3px solid transparent;
+    }
+    .role-item:hover { background: var(--gray-50); }
+    .role-item.active {
+      background: #EFF6FF;
+      border-left-color: var(--brand-secondary);
+    }
+    .role-avatar {
+      width: 28px; height: 28px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 10px; font-weight: 700; flex-shrink: 0;
+    }
+    .role-info { flex: 1; }
+    .role-name { font-size: 12px; font-weight: 600; color: var(--text-primary); }
+    .role-desc { font-size: 10px; color: var(--text-secondary); margin-top: 1px; }
+    .role-check { font-size: 14px; color: var(--brand-secondary); }
+
+    /* Role permission banner */
+    .role-banner {
+      display: none;
+      background: #FFF7ED; border-bottom: 1px solid #FED7AA;
+      padding: 6px 16px; font-size: 11px; color: #92400E;
+      align-items: center; gap: 8px; flex-shrink: 0;
+    }
+    .role-banner.visible { display: flex; }
+    .role-banner-icon { font-size: 14px; }
+
+    /* Elementos bloqueados por rol */
+    .perm-hidden { display: none !important; }
+    .perm-disabled { opacity: .35; pointer-events: none; }
+    .perm-readonly::after {
+      content: '👁'; font-size: 10px; margin-left: 4px;
+      vertical-align: middle; opacity: .6;
+    }
+
+    /* ============================================================
+       SIDEBAR NAV — icon rail
+    ============================================================ */
+    .sidebar-section { padding: var(--sp-2) 0; }
+    .sidebar-label { display: none; } /* hidden in icon rail */
+
+    .nav-item {
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      gap: 3px;
+      padding: 10px 0;
+      color: rgba(255,255,255,.55);
+      cursor: pointer;
+      border-left: 3px solid transparent;
+      transition: all .15s;
+      font-size: 10px;
+      width: var(--sidebar-w);
+      text-align: center;
+      position: relative;
+    }
+    .nav-item:hover { background: rgba(255,255,255,.08); color: rgba(255,255,255,.9); }
+    .nav-item.active {
+      background: rgba(255,255,255,.12);
+      color: #fff;
+      border-left-color: var(--brand-accent);
+    }
+    .nav-item .icon { font-size: 18px; line-height: 1; }
+    .nav-item .nav-label { font-size: 9px; font-weight: 500; letter-spacing: .02em; line-height: 1; }
+    .nav-badge {
+      position: absolute; top: 6px; right: 10px;
+      background: var(--status-error);
+      color: #fff; font-size: 9px; font-weight: 700;
+      padding: 1px 5px; border-radius: 20px;
+      min-width: 16px; text-align: center;
+    }
+
+    /* old nav-sub — no longer used in rail, kept for flyout */
+    .nav-sub { display: none; }
+
+    /* ============================================================
+       FLYOUT PANEL
+    ============================================================ */
+    .flyout {
+      width: 0;
+      overflow: hidden;
+      background: #122d4a;
+      border-right: 1px solid rgba(255,255,255,.1);
+      display: flex; flex-direction: column;
+      flex-shrink: 0;
+      transition: width .2s ease;
+    }
+    .flyout.open {
+      width: var(--flyout-w);
+      overflow: visible;
+    }
+    .flyout-inner {
+      width: var(--flyout-w);
+      display: flex; flex-direction: column;
+      height: 100%;
+    }
+    .flyout-header {
+      padding: var(--sp-4) var(--sp-4) var(--sp-3);
+      border-bottom: 1px solid rgba(255,255,255,.1);
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .flyout-title {
+      color: #fff; font-weight: 600; font-size: 13px;
+      display: flex; align-items: center; gap: var(--sp-2);
+    }
+    .flyout-close {
+      background: none; border: none; color: rgba(255,255,255,.4);
+      font-size: 16px; cursor: pointer; line-height: 1;
+      padding: 2px 4px; border-radius: 4px;
+    }
+    .flyout-close:hover { color: #fff; background: rgba(255,255,255,.1); }
+    .flyout-list { flex: 1; overflow-y: auto; padding: var(--sp-2) 0; }
+    .flyout-group-label {
+      font-size: 10px; font-weight: 600; letter-spacing: .07em;
+      color: rgba(255,255,255,.35); text-transform: uppercase;
+      padding: var(--sp-3) var(--sp-4) var(--sp-1);
+      margin-top: var(--sp-2);
+    }
+    .flyout-item {
+      display: flex; align-items: center; gap: var(--sp-3);
+      padding: 8px var(--sp-4);
+      color: rgba(255,255,255,.7); font-size: 13px;
+      cursor: pointer; border-left: 3px solid transparent;
+      transition: all .12s;
+    }
+    .flyout-item:hover { background: rgba(255,255,255,.08); color: #fff; }
+    .flyout-item.active { background: rgba(255,255,255,.12); color: #fff; border-left-color: var(--brand-accent); }
+
+    /* ============================================================
+       CONTENT TOOLBAR
+    ============================================================ */
+    .content-toolbar {
+      height: 44px;
+      background: var(--surface-card);
+      border-bottom: 1px solid var(--gray-200);
+      display: flex; align-items: center; gap: var(--sp-2);
+      padding: 0 var(--sp-6);
+      flex-shrink: 0;
+    }
+    .breadcrumb { display: flex; align-items: center; gap: var(--sp-2);
+                  color: var(--text-secondary); font-size: 13px; }
+    .breadcrumb span { color: var(--text-primary); font-weight: 500; }
+    .toolbar-actions { margin-left: auto; display: flex; gap: var(--sp-2); }
+
+    /* ============================================================
+       BUTTONS
+    ============================================================ */
+    .btn {
+      display: inline-flex; align-items: center; gap: var(--sp-2);
+      padding: 6px 14px; border-radius: var(--radius-sm);
+      font-size: 13px; font-weight: 500;
+      border: 1px solid transparent;
+      transition: all .15s;
+      white-space: nowrap;
+    }
+    .btn-primary { background: var(--brand-secondary); color: #fff; }
+    .btn-primary:hover { background: #0B5ED7; }
+    .btn-secondary { background: var(--surface-card); color: var(--text-primary);
+                     border-color: var(--gray-300); }
+    .btn-secondary:hover { background: var(--gray-50); }
+    .btn-danger { background: var(--status-error); color: #fff; }
+    .btn-icon {
+      width: 30px; height: 30px; padding: 0;
+      display: inline-flex; align-items: center; justify-content: center;
+      border-radius: var(--radius-sm);
+      background: var(--surface-card);
+      border: 1px solid var(--gray-200);
+      color: var(--text-secondary);
+      font-size: 14px;
+    }
+    .btn-icon:hover { background: var(--gray-100); color: var(--text-primary); }
+    .btn-sm { padding: 4px 10px; font-size: 12px; }
+
+    /* ============================================================
+       STATUS BADGE
+    ============================================================ */
+    .badge {
+      display: inline-flex; align-items: center; gap: 5px;
+      padding: 2px 8px; border-radius: 20px; font-size: 11px; font-weight: 600;
+    }
+    .badge::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+    .badge-success { background: #DCFCE7; color: #15803D; }
+    .badge-error   { background: #FEE2E2; color: #B91C1C; }
+    .badge-warning { background: #FEF9C3; color: #A16207; }
+    .badge-info    { background: #DBEAFE; color: #1D4ED8; }
+    .badge-running { background: #E0F2FE; color: #0369A1; }
+    .badge-pending { background: #F3E8FF; color: #7E22CE; }
+    .badge-blocked { background: #F1F5F9; color: #64748B; }
+
+    /* ============================================================
+       DASHBOARD — nuevo diseño
+    ============================================================ */
+    .db-kpi {
+      background: var(--surface-card); border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-lg); padding: 14px 16px;
+    }
+    .db-kpi-alert { border-color: #FECACA; background: #FFF5F5; }
+    .db-kpi-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+    .db-kpi-label { font-size: 11px; color: var(--text-muted); font-weight: 500; }
+    .db-kpi-icon {
+      width: 26px; height: 26px; border-radius: var(--radius-sm);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 13px; font-weight: 700;
+    }
+    .db-kpi-val { font-size: 26px; font-weight: 700; line-height: 1; margin-bottom: 4px; }
+    .db-kpi-sub { font-size: 11px; color: var(--text-muted); }
+    .db-trend-up { color: #16A34A; font-weight: 600; }
+    .db-trend-down { color: #DC2626; font-weight: 600; }
+
+    .db-panel {
+      background: var(--surface-card); border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-lg); padding: 14px 16px;
+    }
+    .db-panel-header {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 12px;
+    }
+    .db-panel-title { font-size: 13px; font-weight: 600; color: var(--text-primary); }
+
+    /* Mini bar chart */
+    .db-bar {
+      flex: 1; border-radius: 2px 2px 0 0;
+      background: var(--color-primary-300, #93C5FD); min-height: 2px;
+      transition: opacity .15s;
+    }
+    .db-bar:hover { opacity: .7; }
+    .db-bar-now { background: #3B82F6; }
+    .db-bar-future { background: #E2E8F0; }
+
+    /* Atención items */
+    .db-attn-item {
+      display: flex; align-items: center; gap: 10px;
+      padding: 8px 0; border-bottom: 1px solid var(--border-subtle);
+      cursor: pointer;
+    }
+    .db-attn-item:last-child { border-bottom: none; padding-bottom: 0; }
+    .db-attn-item:first-child { padding-top: 0; }
+    .db-attn-dot {
+      width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
+    }
+    .db-attn-body { flex: 1; min-width: 0; }
+    .db-attn-name { font-size: 12px; font-weight: 600; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .db-attn-meta { font-size: 11px; color: var(--text-muted); margin-top: 1px; }
+
+    /* Evento feed */
+    .db-event {
+      display: flex; align-items: flex-start; gap: 8px;
+      padding: 8px 0; border-bottom: 1px solid var(--border-subtle);
+    }
+    .db-event:last-child { border-bottom: none; }
+    .db-event-time { font-size: 10px; color: var(--text-muted); width: 34px; flex-shrink: 0; padding-top: 2px; font-variant-numeric: tabular-nums; }
+    .db-event-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; margin-top: 3px; }
+    .db-event-body { flex: 1; }
+    .db-event-title { font-size: 12px; font-weight: 500; color: var(--text-primary); }
+    .db-event-desc { font-size: 11px; color: var(--text-muted); margin-top: 1px; }
+
+    /* ============================================================
+       DRILL-DOWN PANEL
+    ============================================================ */
+    .dp-header {
+      padding: 16px; border-bottom: 1px solid var(--border-subtle);
+      display: flex; flex-direction: column; gap: 6px; background: #F8FAFC;
+    }
+    .dp-header-top { display: flex; align-items: center; justify-content: space-between; }
+    .dp-title { font-size: 14px; font-weight: 700; color: var(--text-primary); }
+    .dp-sub   { font-size: 11px; color: var(--text-muted); }
+    .dp-close-btn {
+      width: 26px; height: 26px; border: none; background: transparent;
+      border-radius: var(--radius-sm); cursor: pointer; font-size: 14px;
+      color: var(--text-muted); display: flex; align-items: center; justify-content: center;
+    }
+    .dp-close-btn:hover { background: #E2E8F0; }
+
+    .dp-stats-row {
+      display: flex; gap: 8px; padding: 12px 16px;
+      border-bottom: 1px solid var(--border-subtle);
+      background: #F8FAFC; flex-shrink: 0;
+    }
+    .dp-stat {
+      flex: 1; text-align: center; padding: 6px 4px;
+      border-radius: var(--radius-sm); background: #fff;
+      border: 1px solid var(--border-subtle);
+    }
+    .dp-stat-val { font-size: 16px; font-weight: 700; line-height: 1; }
+    .dp-stat-lbl { font-size: 10px; color: var(--text-muted); margin-top: 2px; }
+
+    /* Breadcrumb */
+    .dp-crumb {
+      display: flex; align-items: center; gap: 4px;
+      font-size: 12px; color: var(--text-muted);
+    }
+    .dp-crumb-item {
+      cursor: pointer; color: var(--brand-secondary);
+      max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .dp-crumb-item:hover { text-decoration: underline; }
+    .dp-crumb-sep { color: var(--border-default); }
+    .dp-crumb-current { color: var(--text-primary); font-weight: 600; }
+
+    /* List items */
+    .dp-list { display: flex; flex-direction: column; }
+    .dp-list-item {
+      display: flex; align-items: center; gap: 10px;
+      padding: 10px 16px; border-bottom: 1px solid var(--border-subtle);
+      cursor: pointer; transition: background .1s;
+    }
+    .dp-list-item:hover { background: #F8FAFC; }
+    .dp-list-item:last-child { border-bottom: none; }
+
+    .dp-item-dot {
+      width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
+    }
+    .dp-item-body { flex: 1; min-width: 0; }
+    .dp-item-name { font-size: 12px; font-weight: 600; color: var(--text-primary); }
+    .dp-item-meta { font-size: 11px; color: var(--text-muted); margin-top: 1px; }
+    .dp-item-right { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+    .dp-item-arrow { font-size: 10px; color: var(--text-muted); }
+
+    /* Detalle de comando */
+    .dp-detail-section {
+      padding: 14px 16px; border-bottom: 1px solid var(--border-subtle);
+    }
+    .dp-detail-section-title {
+      font-size: 11px; font-weight: 600; color: var(--text-muted);
+      text-transform: uppercase; letter-spacing: .04em; margin-bottom: 8px;
+    }
+    .dp-detail-row {
+      display: flex; gap: 8px; margin-bottom: 6px; font-size: 12px;
+    }
+    .dp-detail-label { color: var(--text-muted); width: 110px; flex-shrink: 0; }
+    .dp-detail-value { color: var(--text-primary); font-weight: 500; }
+    .dp-log-block {
+      background: #0F172A; color: #94A3B8; font-family: monospace;
+      font-size: 11px; line-height: 1.6; padding: 10px 12px;
+      border-radius: var(--radius-md); overflow-x: auto;
+      white-space: pre;
+    }
+    .dp-log-error { color: #F87171; }
+    .dp-log-ok    { color: #4ADE80; }
+    .dp-log-info  { color: #60A5FA; }
+
+    /* ============================================================
+       BITÁCORAS PAGE — stat pills + new cards
+    ============================================================ */
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+
+    .bit-stat-pill {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 5px 12px; border-radius: 999px; cursor: pointer;
+      border: 1.5px solid transparent; transition: all .15s;
+      font-size: 12px; user-select: none;
+    }
+    .bit-stat-pill .bit-stat-num { font-size: 15px; font-weight: 700; line-height: 1; }
+    .bit-stat-pill .bit-stat-label { color: var(--text-muted); }
+    .bit-stat-pill.active .bit-stat-label { color: inherit; }
+
+    .bit-stat-all    { background:#F1F5F9; color:var(--text-primary); border-color:#E2E8F0; }
+    .bit-stat-all.active { background:#1E293B; color:#fff; border-color:#1E293B; }
+    .bit-stat-running{ background:#E0F2FE; color:#0369A1; }
+    .bit-stat-running.active { border-color:#0369A1; }
+    .bit-stat-error  { background:#FEF2F2; color:#DC2626; }
+    .bit-stat-error.active { border-color:#DC2626; }
+    .bit-stat-warning{ background:#FFFBEB; color:#D97706; }
+    .bit-stat-warning.active { border-color:#D97706; }
+    .bit-stat-ok     { background:#F0FDF4; color:#16A34A; }
+    .bit-stat-ok.active { border-color:#16A34A; }
+    .bit-stat-neutral{ background:#F8FAFC; color:#64748B; }
+    .bit-stat-neutral.active { border-color:#64748B; }
+
+    .sort-btn {
+      padding: 4px 10px; border-radius: var(--radius-md);
+      border: 1px solid var(--border-default); background: transparent;
+      font-size: 11px; color: var(--text-secondary); cursor: pointer; transition: all .15s;
+    }
+    .sort-btn:hover { background: #F1F5F9; }
+    .sort-btn.active { background: var(--brand-secondary); color: #fff; border-color: var(--brand-secondary); }
+
+    /* Bitácora card — nueva versión */
+    .card-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+      gap: 14px;
+    }
+    .bita-card {
+      background: var(--surface-card); border-radius: var(--radius-lg);
+      border: 1px solid var(--border-subtle); padding: 14px;
+      border-left: 3px solid transparent;
+      display: flex; flex-direction: column; gap: 8px;
+      transition: box-shadow .15s, transform .15s; cursor: pointer;
+    }
+    .bita-card:hover { box-shadow: var(--shadow-md); transform: translateY(-1px); }
+    .bita-error   { border-left-color: var(--status-error); }
+    .bita-ok      { border-left-color: var(--status-ok); }
+    .bita-running { border-left-color: var(--status-running); }
+    .bita-warning { border-left-color: var(--status-warning); }
+    .bita-neutral { border-left-color: #CBD5E1; }
+    .bita-pending { border-left-color: #A78BFA; }
+
+    .bita-card-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
+    .bita-name { font-size: 12px; font-weight: 600; color: var(--text-primary); line-height: 1.3; }
+    .bita-meta { display: flex; flex-direction: column; gap: 2px; font-size: 11px; color: var(--text-muted); }
+    .bita-badge-row { display: flex; align-items: center; gap: 6px; }
+    .bita-stats {
+      display: flex; gap: 6px;
+    }
+    .bita-stat {
+      flex: 1; display: flex; flex-direction: column; align-items: center;
+      padding: 4px 0; border-radius: var(--radius-sm);
+      background: #F8FAFC;
+    }
+    .bita-stat-val { font-size: 14px; font-weight: 700; line-height: 1; color: var(--text-primary); }
+    .bita-stat-lbl { font-size: 9px; color: var(--text-muted); margin-top: 1px; }
+    .bita-stat.bita-ok  .bita-stat-val { color: var(--status-ok); }
+    .bita-stat.bita-err .bita-stat-val { color: var(--status-error); }
+    .bita-stat.bita-pend .bita-stat-val { color: #7C3AED; }
+
+    .bita-progress { height: 4px; border-radius: 2px; background: #E2E8F0; overflow: hidden; }
+    .bita-progress-bar { height: 100%; background: var(--status-running); border-radius: 2px; transition: width .3s; }
+
+    .bita-actions {
+      display: flex; gap: 4px; padding-top: 4px;
+      border-top: 1px solid var(--border-subtle); margin-top: 2px;
+    }
+    .btn-icon-sm {
+      width: 24px; height: 24px; border-radius: var(--radius-sm);
+      border: 1px solid var(--border-default); background: transparent;
+      cursor: pointer; font-size: 12px; color: var(--text-muted);
+      display: inline-flex; align-items: center; justify-content: center;
+      transition: background .12s, color .12s;
+    }
+    .btn-icon-sm:hover { background: #F1F5F9; color: var(--text-primary); }
+
+    /* ============================================================
+       BULK ACTIONS
+    ============================================================ */
+    .bita-card { position: relative; }
+
+    .bita-checkbox {
+      position: absolute; top: 10px; left: 10px;
+      width: 16px; height: 16px; border-radius: 4px;
+      border: 1.5px solid var(--border-default);
+      background: #fff; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      opacity: 0; transition: opacity .15s;
+      z-index: 2;
+    }
+    .bita-card:hover .bita-checkbox,
+    .bita-card.selected .bita-checkbox { opacity: 1; }
+    .bita-card.selected .bita-checkbox {
+      background: var(--brand-secondary);
+      border-color: var(--brand-secondary);
+      color: #fff; font-size: 10px;
+    }
+    .bita-card.selected {
+      outline: 2px solid var(--brand-secondary);
+      outline-offset: -1px;
+      background: #F0F7FF;
+    }
+
+    /* Bulk toolbar */
+    .bulk-bar {
+      position: sticky; top: 0; z-index: 10;
+      display: none;
+      align-items: center; gap: 10px;
+      background: #1E293B; color: #fff;
+      padding: 10px 24px; border-radius: 0;
+      font-size: 12px; flex-shrink: 0;
+    }
+    .bulk-bar.visible { display: flex; }
+    .bulk-bar-count { font-weight: 700; min-width: 120px; }
+    .bulk-bar-sep { width: 1px; height: 18px; background: rgba(255,255,255,.2); }
+    .bulk-bar-btn {
+      padding: 5px 12px; border-radius: var(--radius-md);
+      border: 1px solid rgba(255,255,255,.25); background: transparent;
+      color: #fff; font-size: 12px; cursor: pointer; transition: background .12s;
+      display: flex; align-items: center; gap: 5px;
+    }
+    .bulk-bar-btn:hover { background: rgba(255,255,255,.12); }
+    .bulk-bar-btn.danger { border-color: #F87171; color: #F87171; }
+    .bulk-bar-btn.danger:hover { background: rgba(248,113,113,.15); }
+    .bulk-bar-dismiss {
+      margin-left: auto; background: none; border: none;
+      color: rgba(255,255,255,.5); font-size: 16px; cursor: pointer;
+      padding: 0 4px; line-height: 1;
+    }
+    .bulk-bar-dismiss:hover { color: #fff; }
+
+    /* ============================================================
+       JOB CARD (ProBatch style, unified)
+    ============================================================ */
+    .cards-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+      gap: var(--sp-4);
+    }
+    .job-card {
+      background: var(--surface-card);
+      border-radius: var(--radius-md);
+      border: 1px solid var(--gray-200);
+      border-top: 3px solid var(--gray-300);
+      box-shadow: var(--shadow-sm);
+      padding: var(--sp-4);
+      display: flex; flex-direction: column; gap: var(--sp-3);
+      transition: box-shadow .15s;
+    }
+    .job-card:hover { box-shadow: var(--shadow-md); }
+    .job-card.success { border-top-color: var(--status-success); }
+    .job-card.error   { border-top-color: var(--status-error); }
+    .job-card.warning { border-top-color: var(--status-warning); }
+    .job-card.running { border-top-color: var(--status-running); }
+    .job-card.pending { border-top-color: var(--status-pending); }
+
+    .card-header { display: flex; align-items: flex-start; justify-content: space-between; }
+    .card-title  { font-weight: 600; font-size: 13px; line-height: 1.3; color: var(--text-primary); }
+    .card-menu   { color: var(--text-muted); font-size: 18px; cursor: pointer; line-height: 1; }
+    .card-meta   { display: flex; flex-direction: column; gap: 3px; }
+    .card-meta-row { display: flex; gap: var(--sp-2); font-size: 11px; color: var(--text-secondary); }
+    .card-meta-row strong { color: var(--text-primary); }
+
+    .card-stats {
+      display: flex; gap: var(--sp-2);
+    }
+    .stat-pill {
+      flex: 1; text-align: center;
+      padding: 4px; border-radius: var(--radius-sm);
+      font-size: 13px; font-weight: 700; line-height: 1;
+    }
+    .stat-pill small { display: block; font-size: 9px; font-weight: 400;
+                       color: var(--text-secondary); margin-top: 2px; }
+    .stat-total   { background: var(--gray-100); color: var(--gray-700); }
+    .stat-ok      { background: #DCFCE7; color: #15803D; }
+    .stat-error   { background: #FEE2E2; color: #B91C1C; }
+    .stat-warning { background: #FEF9C3; color: #A16207; }
+    .stat-pending { background: #F3E8FF; color: #7E22CE; }
+
+    .card-actions { display: flex; gap: 4px; flex-wrap: wrap; }
+    .card-actions .btn-icon { width: 26px; height: 26px; font-size: 12px; }
+
+    /* progress bar */
+    .progress-bar { height: 3px; background: var(--gray-200); border-radius: 2px; overflow: hidden; }
+    .progress-fill { height: 100%; background: var(--status-running); border-radius: 2px;
+                     transition: width .3s; }
+
+    /* ============================================================
+       TABLE (Accusys style, unified)
+    ============================================================ */
+    .data-table-wrap {
+      background: var(--surface-card);
+      border-radius: var(--radius-md);
+      border: 1px solid var(--gray-200);
+      box-shadow: var(--shadow-sm);
+      overflow: hidden;
+    }
+    .table-toolbar {
+      display: flex; align-items: center; gap: var(--sp-3);
+      padding: var(--sp-4);
+      border-bottom: 1px solid var(--gray-200);
+    }
+    .table-search {
+      display: flex; align-items: center; gap: var(--sp-2);
+      background: var(--gray-50); border: 1px solid var(--gray-200);
+      border-radius: var(--radius-sm); padding: 5px 10px;
+      font-size: 13px; color: var(--text-secondary);
+      flex: 1; max-width: 280px;
+    }
+    .table-search input { border: none; background: none; outline: none;
+                          font-size: 13px; color: var(--text-primary); width: 100%; }
+    data-table { width: 100%; border-collapse: collapse; }
+    table { width: 100%; border-collapse: collapse; }
+    thead th {
+      text-align: left; font-size: 11px; font-weight: 600;
+      text-transform: uppercase; letter-spacing: .04em;
+      color: var(--text-secondary);
+      padding: var(--sp-3) var(--sp-4);
+      background: var(--gray-50);
+      border-bottom: 1px solid var(--gray-200);
+    }
+    tbody tr { border-bottom: 1px solid var(--gray-100); }
+    tbody tr:hover { background: var(--gray-50); }
+    tbody td { padding: 10px var(--sp-4); font-size: 13px; }
+    tbody tr:last-child { border-bottom: none; }
+    .table-footer {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: var(--sp-3) var(--sp-4);
+      border-top: 1px solid var(--gray-200);
+      font-size: 12px; color: var(--text-secondary);
+    }
+    .pagination { display: flex; gap: 4px; }
+    .page-btn {
+      width: 26px; height: 26px; border-radius: var(--radius-sm);
+      border: 1px solid var(--gray-200); background: var(--surface-card);
+      font-size: 12px; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .page-btn.active { background: var(--brand-secondary); color: #fff; border-color: var(--brand-secondary); }
+
+    /* ============================================================
+       NOTIFICATION PANEL
+    ============================================================ */
+    .notif-header {
+      padding: var(--sp-4);
+      border-bottom: 1px solid var(--gray-200);
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .notif-title { font-weight: 600; font-size: 13px; }
+    .notif-tabs { display: flex; gap: 0; border-bottom: 1px solid var(--gray-200); }
+    .notif-tab {
+      flex: 1; padding: var(--sp-2) var(--sp-3); text-align: center;
+      font-size: 12px; cursor: pointer; color: var(--text-secondary);
+      border-bottom: 2px solid transparent;
+    }
+    .notif-tab.active { color: var(--brand-secondary); border-bottom-color: var(--brand-secondary); font-weight: 600; }
+    .notif-list { flex: 1; overflow-y: auto; }
+    .notif-group { padding: var(--sp-3) var(--sp-4) var(--sp-2); }
+    .notif-group-label { font-size: 11px; font-weight: 600; color: var(--text-secondary);
+                         text-transform: uppercase; letter-spacing: .04em; }
+    .notif-item {
+      padding: var(--sp-3) var(--sp-4);
+      border-left: 3px solid transparent;
+      cursor: pointer;
+      font-size: 12px; line-height: 1.4;
+    }
+    .notif-item:hover { background: var(--gray-50); }
+    .notif-item.error { border-left-color: var(--status-error); background: #FFF5F5; }
+    .notif-item .notif-job { font-weight: 600; color: var(--text-primary); font-size: 11px; }
+    .notif-item .notif-msg { color: var(--text-secondary); margin-top: 2px; }
+    .notif-item .notif-time { color: var(--text-muted); font-size: 10px; margin-top: 3px; }
+
+    /* ============================================================
+       TABS
+    ============================================================ */
+    .tabs { display: flex; border-bottom: 1px solid var(--gray-200); margin-bottom: var(--sp-5); }
+    .tab {
+      padding: 8px 16px; font-size: 13px; cursor: pointer;
+      color: var(--text-secondary); border-bottom: 2px solid transparent;
+      margin-bottom: -1px;
+    }
+    .tab.active { color: var(--brand-secondary); border-bottom-color: var(--brand-secondary); font-weight: 600; }
+    .tab:hover:not(.active) { color: var(--text-primary); }
+
+    /* ============================================================
+       SECTION HEADERS
+    ============================================================ */
+    .section-header {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: var(--sp-4);
+    }
+    .section-title { font-size: 15px; font-weight: 600; color: var(--text-primary); }
+    .section-sub { font-size: 12px; color: var(--text-secondary); margin-top: 2px; }
+
+    /* ============================================================
+       STAT CARDS (KPIs)
+    ============================================================ */
+    .kpi-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--sp-4); margin-bottom: var(--sp-6); }
+    .kpi-card {
+      background: var(--surface-card); border-radius: var(--radius-md);
+      border: 1px solid var(--gray-200); padding: var(--sp-4);
+      box-shadow: var(--shadow-sm);
+    }
+    .kpi-label { font-size: 11px; color: var(--text-secondary); font-weight: 500; text-transform: uppercase; letter-spacing: .04em; }
+    .kpi-value { font-size: 26px; font-weight: 700; color: var(--text-primary); margin: 4px 0; }
+    .kpi-trend { font-size: 11px; color: var(--text-secondary); }
+    .kpi-icon { float: right; font-size: 28px; opacity: .15; margin-top: -4px; }
+
+    /* ============================================================
+       COLOR TOKEN SWATCHES (Design System page)
+    ============================================================ */
+    .token-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: var(--sp-3); }
+    .swatch { border-radius: var(--radius-md); overflow: hidden; border: 1px solid var(--gray-200); }
+    .swatch-color { height: 56px; }
+    .swatch-label { padding: 6px 8px; font-size: 11px; background: var(--surface-card); }
+    .swatch-name { font-weight: 600; }
+    .swatch-hex { color: var(--text-secondary); font-family: monospace; }
+
+    /* ============================================================
+       PAGE TABS (navigation between demo pages)
+    ============================================================ */
+    .page-nav {
+      display: none; /* controlled by JS */
+    }
+    .demo-page { display: none; }
+    .demo-page.active { display: block; }
+
+    /* ============================================================
+       COMPONENT DOC CARD
+    ============================================================ */
+    .doc-card {
+      background: var(--surface-card); border-radius: var(--radius-md);
+      border: 1px solid var(--gray-200); margin-bottom: var(--sp-6);
+      box-shadow: var(--shadow-sm);
+    }
+    .doc-card-header {
+      padding: var(--sp-4) var(--sp-6);
+      border-bottom: 1px solid var(--gray-200);
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .doc-card-title { font-weight: 600; font-size: 14px; }
+    .doc-card-body { padding: var(--sp-6); }
+    .doc-card-note {
+      background: var(--gray-50); border-left: 3px solid var(--brand-secondary);
+      padding: var(--sp-3) var(--sp-4); border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+      font-size: 12px; color: var(--text-secondary); margin-top: var(--sp-4);
+    }
+
+    /* ============================================================
+       DEMO NAV (top tabs for the prototype pages)
+    ============================================================ */
+
+    /* inline chip */
+    .chip {
+      display: inline-flex; align-items: center; gap: 4px;
+      background: var(--gray-100); border-radius: 20px;
+      padding: 2px 8px; font-size: 11px; color: var(--text-secondary);
+    }
+    .chip.new { background: #DCFCE7; color: #15803D; }
+    .chip.changed { background: #FEF9C3; color: #A16207; }
+
+    /* ============================================================
+       BULK ACTION TOOLBAR (contextual, appears on selection)
+    ============================================================ */
+    .bulk-toolbar {
+      display: none;
+      align-items: center; gap: var(--sp-3);
+      background: var(--brand-primary);
+      border-radius: var(--radius-md);
+      padding: var(--sp-3) var(--sp-4);
+      margin-bottom: var(--sp-4);
+      box-shadow: var(--shadow-md);
+      animation: slideDown .15s ease;
+    }
+    .bulk-toolbar.visible { display: flex; }
+    @keyframes slideDown {
+      from { opacity: 0; transform: translateY(-6px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    .bulk-count {
+      color: #fff; font-size: 13px; font-weight: 600;
+      background: rgba(255,255,255,.2); padding: 2px 10px;
+      border-radius: 20px;
+    }
+    .bulk-sep { width: 1px; height: 20px; background: rgba(255,255,255,.2); }
+    .bulk-action-btn {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 5px 12px; border-radius: var(--radius-sm);
+      background: rgba(255,255,255,.1); border: 1px solid rgba(255,255,255,.2);
+      color: #fff; font-size: 12px; font-weight: 500; cursor: pointer;
+      transition: background .15s;
+    }
+    .bulk-action-btn:hover { background: rgba(255,255,255,.25); }
+    .bulk-action-btn.danger { background: rgba(239,68,68,.3); border-color: rgba(239,68,68,.5); }
+    .bulk-action-btn.danger:hover { background: rgba(239,68,68,.5); }
+    .bulk-clear {
+      margin-left: auto; background: none; border: none;
+      color: rgba(255,255,255,.6); font-size: 18px; cursor: pointer; line-height: 1;
+    }
+    .bulk-clear:hover { color: #fff; }
+
+    /* checkbox in cards */
+    .card-checkbox {
+      position: absolute; top: 10px; left: 10px;
+      width: 16px; height: 16px; cursor: pointer;
+      accent-color: var(--brand-secondary);
+      opacity: 0; transition: opacity .15s;
+    }
+    .job-card { position: relative; }
+    .job-card:hover .card-checkbox,
+    .job-card.selected .card-checkbox { opacity: 1; }
+    .job-card.selected {
+      border-color: var(--brand-secondary);
+      box-shadow: 0 0 0 2px rgba(13,110,253,.2);
+    }
+
+    /* ============================================================
+       REPORT CARDS
+    ============================================================ */
+    .report-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: var(--sp-3);
+    }
+    .report-card {
+      background: var(--surface-card);
+      border: 1px solid var(--gray-200);
+      border-radius: var(--radius-md);
+      padding: var(--sp-4);
+      cursor: pointer;
+      transition: all .15s;
+      display: flex; flex-direction: column; gap: 6px;
+    }
+    .report-card:hover {
+      border-color: var(--brand-secondary);
+      box-shadow: var(--shadow-md);
+      transform: translateY(-1px);
+    }
+    .report-icon { font-size: 22px; }
+    .report-name { font-weight: 600; font-size: 13px; color: var(--text-primary); }
+    .report-desc { font-size: 11px; color: var(--text-secondary); line-height: 1.4; }
+    .report-card.hidden { display: none; }
+
+    /* scrollbar */
+    ::-webkit-scrollbar { width: 5px; height: 5px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--gray-300); border-radius: 3px; }
+
+    /* ============================================================
+       FORM ELEMENTS
+    ============================================================ */
+    .form-group { display: flex; flex-direction: column; gap: 4px; }
+    .form-label { font-size: 12px; font-weight: 500; color: var(--text-secondary); }
+    .form-input {
+      padding: 7px 10px; border-radius: var(--radius-sm);
+      border: 1px solid var(--gray-300); font-size: 13px;
+      outline: none; transition: border-color .15s;
+    }
+    .form-input:focus { border-color: var(--brand-secondary); box-shadow: 0 0 0 3px rgba(13,110,253,.1); }
+    .form-select {
+      padding: 7px 28px 7px 10px; border-radius: var(--radius-sm);
+      border: 1px solid var(--gray-300); font-size: 13px;
+      outline: none; background: var(--surface-card);
+      appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%2394A3B8' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+      background-repeat: no-repeat; background-position: right 8px center;
+    }
+    .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-4); }
+  </style>
+</head>
+<body>
+
+<!-- ============================================================
+     HEADER
+============================================================ -->
+<header class="app-header">
+  <div class="header-brand">
+    <div class="header-logo">PB</div>
+    <span class="header-title">ProBatch</span>
+    <span class="header-env">BERSA DESA</span>
+  </div>
+  <div class="header-actions">
+    <button class="btn-icon header-btn" title="Notificaciones" onclick="toggleNotif()" style="background:rgba(255,255,255,.1);border:none;color:#fff">
+      🔔<span class="header-badge">4</span>
+    </button>
+    <div class="header-user" id="roleToggle" onclick="toggleRoleDropdown(event)">
+      <div class="avatar" id="headerAvatar">AD</div>
+      <span id="headerRoleName">Administrador</span>
+      <span style="font-size:10px;opacity:.6">▾</span>
+    </div>
+  </div>
+</header>
+<div class="role-dropdown" id="roleDropdown">
+  <div class="role-dropdown-header">Simular usuario</div>
+  <!-- roles se generan por JS -->
+</div>
+
+<!-- Banner de rol activo -->
+<div class="role-banner" id="roleBanner">
+  <span class="role-banner-icon">⚠️</span>
+  <span id="roleBannerText">Estás viendo la app como <strong>Operador</strong> — algunas funciones están restringidas.</span>
+</div>
+
+<!-- ============================================================
+     BODY
+============================================================ -->
+<div class="app-body">
+
+  <!-- SIDEBAR: icon rail -->
+  <nav class="sidebar">
+
+    <!-- Icon rail -->
+    <div style="width:var(--sidebar-w);flex-shrink:0;display:flex;flex-direction:column;height:100%;background:var(--surface-sidebar)">
+
+      <div style="padding:var(--sp-3) 0 var(--sp-2);border-bottom:1px solid rgba(255,255,255,.08)">
+        <div class="nav-item active" data-nav="dashboard" onclick="railNav('dashboard',this)">
+          <span class="icon">⊞</span><span class="nav-label">Inicio</span>
+        </div>
+        <div class="nav-item" data-nav="bitacoras" onclick="railNav('bitacoras',this)" style="position:relative">
+          <span class="icon">📋</span><span class="nav-label">Bitácoras</span>
+          <span class="nav-badge">3</span>
+        </div>
+      </div>
+
+      <div style="padding:var(--sp-2) 0;border-bottom:1px solid rgba(255,255,255,.08)">
+        <div class="nav-item" data-nav="batch" onclick="openFlyout('batch',this)">
+          <span class="icon">⚡</span><span class="nav-label">Batch</span>
+        </div>
+        <div class="nav-item" data-nav="planificador" onclick="openFlyout('planificador',this)">
+          <span class="icon">📅</span><span class="nav-label">Planif.</span>
+        </div>
+        <div class="nav-item" data-nav="ejecucion" onclick="openFlyout('ejecucion',this)">
+          <span class="icon">▶️</span><span class="nav-label">Ejecución</span>
+        </div>
+      </div>
+
+      <div style="padding:var(--sp-2) 0;border-bottom:1px solid rgba(255,255,255,.08)">
+        <div class="nav-item" data-nav="reportes" onclick="railNav('reportes',this)">
+          <span class="icon">📊</span><span class="nav-label">Reportes</span>
+        </div>
+      </div>
+
+      <div style="padding:var(--sp-2) 0;margin-top:auto">
+        <div class="nav-item" data-nav="admin" onclick="openFlyout('admin',this)">
+          <span class="icon">⚙️</span><span class="nav-label">Admin.</span>
+        </div>
+        <div class="nav-item" data-nav="seguridad" onclick="openFlyout('seguridad',this)">
+          <span class="icon">🔒</span><span class="nav-label">Seguridad</span>
+        </div>
+        <div class="nav-item" data-nav="mantenimiento">
+          <span class="icon">🔧</span><span class="nav-label">Manten.</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Flyout panel -->
+    <div class="flyout" id="flyout">
+      <div class="flyout-inner">
+        <div class="flyout-header">
+          <span class="flyout-title" id="flyout-title">Sección</span>
+          <button class="flyout-close" onclick="closeFlyout()">✕</button>
+        </div>
+        <div class="flyout-list" id="flyout-list"></div>
+      </div>
+    </div>
+
+  </nav>
+
+  <!-- DRILL-DOWN PANEL -->
+  <div id="dpOverlay" onclick="closeDp()" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.25);z-index:300"></div>
+  <div id="dpPanel" style="
+    position:fixed;top:0;right:0;height:100vh;width:480px;
+    background:var(--surface-card);border-left:1px solid var(--border-subtle);
+    box-shadow:-4px 0 24px rgba(0,0,0,.12);
+    display:flex;flex-direction:column;
+    transform:translateX(100%);transition:transform .25s cubic-bezier(.4,0,.2,1);
+    z-index:301;
+  ">
+    <!-- Breadcrumb / nav -->
+    <div id="dpBreadcrumb" style="
+      display:flex;align-items:center;gap:6px;
+      padding:14px 16px;border-bottom:1px solid var(--border-subtle);
+      font-size:12px;flex-shrink:0;background:var(--surface-card);
+    "></div>
+
+    <!-- Content area (scrollable) -->
+    <div id="dpContent" style="flex:1;overflow-y:auto;"></div>
+  </div>
+
+  <!-- MAIN -->
+  <div class="main-content">
+
+    <!-- Demo page navigation -->
+
+    <div class="content-area">
+
+      <!-- ======================================================
+           PAGE: DASHBOARD
+      ====================================================== -->
+      <div class="demo-page active" id="page-dashboard" data-display="flex" style="display:flex;flex-direction:column;height:100%;overflow:hidden;">
+
+        <!-- Header -->
+        <div style="padding:18px 24px 14px;background:var(--surface-card);border-bottom:1px solid var(--border-subtle);flex-shrink:0;display:flex;align-items:center;justify-content:space-between;">
+          <div>
+            <div style="font-size:var(--text-xl);font-weight:600;color:var(--text-primary);margin-bottom:1px">Dashboard</div>
+            <div style="font-size:var(--text-sm);color:var(--text-muted)">Resumen del sistema — 31 Mar 2026</div>
+          </div>
+          <button class="btn btn-secondary btn-sm">↺ Refrescar</button>
+        </div>
+
+        <!-- Body scroll -->
+        <div style="flex:1;overflow-y:auto;padding:20px 24px;display:flex;flex-direction:column;gap:20px;">
+
+          <!-- KPIs -->
+          <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;">
+
+            <div class="db-kpi">
+              <div class="db-kpi-top">
+                <span class="db-kpi-label">Bitácoras activas</span>
+                <span class="db-kpi-icon" style="background:#EFF6FF;color:#3B82F6">📋</span>
+              </div>
+              <div class="db-kpi-val" style="color:#3B82F6">24</div>
+              <div class="db-kpi-sub"><span class="db-trend-up">↑ 3</span> vs ayer</div>
+            </div>
+
+            <div class="db-kpi">
+              <div class="db-kpi-top">
+                <span class="db-kpi-label">Comandos OK hoy</span>
+                <span class="db-kpi-icon" style="background:#F0FDF4;color:#16A34A">✓</span>
+              </div>
+              <div class="db-kpi-val" style="color:#16A34A">1,284</div>
+              <div class="db-kpi-sub"><span class="db-trend-up">↑ 8%</span> vs ayer</div>
+            </div>
+
+            <div class="db-kpi db-kpi-alert">
+              <div class="db-kpi-top">
+                <span class="db-kpi-label">Errores activos</span>
+                <span class="db-kpi-icon" style="background:#FEF2F2;color:#DC2626">!</span>
+              </div>
+              <div class="db-kpi-val" style="color:#DC2626">12</div>
+              <div class="db-kpi-sub" style="color:#DC2626">Requieren atención</div>
+            </div>
+
+            <div class="db-kpi">
+              <div class="db-kpi-top">
+                <span class="db-kpi-label">En ejecución</span>
+                <span class="db-kpi-icon" style="background:#E0F2FE;color:#0369A1">▶</span>
+              </div>
+              <div class="db-kpi-val" style="color:#0369A1">7</div>
+              <div class="db-kpi-sub">Promedio: <strong>4m</strong></div>
+            </div>
+
+          </div>
+
+          <!-- 2-col layout -->
+          <div style="display:grid;grid-template-columns:1fr 320px;gap:16px;align-items:start;">
+
+            <!-- Col izq -->
+            <div style="display:flex;flex-direction:column;gap:16px;">
+
+              <!-- Actividad del día — mini bar chart -->
+              <div class="db-panel">
+                <div class="db-panel-header">
+                  <span class="db-panel-title">Actividad hoy</span>
+                  <span style="font-size:11px;color:var(--text-muted)">Comandos ejecutados por hora</span>
+                </div>
+                <div style="display:flex;align-items:flex-end;gap:4px;height:60px;padding:4px 0;">
+                  <!-- mini bars representing hours 0-23 -->
+                  <div class="db-bar" style="height:15%"></div>
+                  <div class="db-bar" style="height:10%"></div>
+                  <div class="db-bar" style="height:8%"></div>
+                  <div class="db-bar" style="height:12%"></div>
+                  <div class="db-bar" style="height:20%"></div>
+                  <div class="db-bar" style="height:35%"></div>
+                  <div class="db-bar" style="height:55%"></div>
+                  <div class="db-bar" style="height:72%"></div>
+                  <div class="db-bar" style="height:90%"></div>
+                  <div class="db-bar" style="height:85%"></div>
+                  <div class="db-bar" style="height:78%"></div>
+                  <div class="db-bar" style="height:95%"></div>
+                  <div class="db-bar" style="height:100%"></div>
+                  <div class="db-bar" style="height:88%"></div>
+                  <div class="db-bar" style="height:76%"></div>
+                  <div class="db-bar" style="height:82%"></div>
+                  <div class="db-bar db-bar-now" style="height:60%"></div>
+                  <div class="db-bar db-bar-future" style="height:0%"></div>
+                  <div class="db-bar db-bar-future" style="height:0%"></div>
+                  <div class="db-bar db-bar-future" style="height:0%"></div>
+                  <div class="db-bar db-bar-future" style="height:0%"></div>
+                  <div class="db-bar db-bar-future" style="height:0%"></div>
+                  <div class="db-bar db-bar-future" style="height:0%"></div>
+                  <div class="db-bar db-bar-future" style="height:0%"></div>
+                </div>
+                <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--text-muted);margin-top:2px">
+                  <span>00:00</span><span>06:00</span><span>12:00</span><span>16:00 ▲</span><span>23:00</span>
+                </div>
+              </div>
+
+              <!-- Requieren atención -->
+              <div class="db-panel">
+                <div class="db-panel-header">
+                  <span class="db-panel-title">Requieren atención</span>
+                  <a style="font-size:11px;color:var(--brand-secondary);cursor:pointer;text-decoration:none" onclick="railNav('bitacoras',document.querySelector('[data-nav=bitacoras]'))">Ver todas →</a>
+                </div>
+
+                <div class="db-attn-item db-attn-error">
+                  <div class="db-attn-dot" style="background:#DC2626"></div>
+                  <div class="db-attn-body">
+                    <div class="db-attn-name">TEST FEDE 20260326</div>
+                    <div class="db-attn-meta">SRV PRUEBAS N · 1 error en comando 100102</div>
+                  </div>
+                  <span class="badge badge-error" style="flex-shrink:0">Con Errores</span>
+                </div>
+
+                <div class="db-attn-item db-attn-error">
+                  <div class="db-attn-dot" style="background:#DC2626"></div>
+                  <div class="db-attn-body">
+                    <div class="db-attn-name">TEST PARA A1</div>
+                    <div class="db-attn-meta">UNIX_2 · 5 errores · Pendiente revisión</div>
+                  </div>
+                  <span class="badge badge-error" style="flex-shrink:0">Con Errores</span>
+                </div>
+
+                <div class="db-attn-item db-attn-warning">
+                  <div class="db-attn-dot" style="background:#D97706"></div>
+                  <div class="db-attn-body">
+                    <div class="db-attn-name">TEST PARALELO 1C</div>
+                    <div class="db-attn-meta">UNIX_2 · 3 advertencias · Duración inusual</div>
+                  </div>
+                  <span class="badge badge-warning" style="flex-shrink:0">Advertencias</span>
+                </div>
+
+                <div class="db-attn-item db-attn-running">
+                  <div class="db-attn-dot" style="background:#0369A1;animation:pulse 1.4s infinite"></div>
+                  <div class="db-attn-body">
+                    <div class="db-attn-name">ACCUSYS ABS - POST CIERRES</div>
+                    <div class="db-attn-meta">UNIX PRUEBAS · En ejecución hace 14h · 62% completado</div>
+                  </div>
+                  <span class="badge badge-running" style="flex-shrink:0">Ejecutando</span>
+                </div>
+
+              </div>
+
+              <!-- En ejecución ahora -->
+              <div class="db-panel">
+                <div class="db-panel-header">
+                  <span class="db-panel-title">En ejecución ahora</span>
+                  <span style="font-size:11px;color:var(--text-muted)">3 activas</span>
+                </div>
+
+                <div style="display:flex;flex-direction:column;gap:10px;">
+                  <div>
+                    <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px">
+                      <span style="font-weight:600;color:var(--text-primary)">ACCUSYS ABS - POST CIERRES</span>
+                      <span style="color:var(--text-muted)">62%</span>
+                    </div>
+                    <div class="bita-progress"><div class="bita-progress-bar" style="width:62%;background:#0369A1"></div></div>
+                    <div style="font-size:11px;color:var(--text-muted);margin-top:2px">439 comandos · 14 OK · 14 pend.</div>
+                  </div>
+                  <div>
+                    <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px">
+                      <span style="font-weight:600;color:var(--text-primary)">BATCH NOCHE SRV2</span>
+                      <span style="color:var(--text-muted)">38%</span>
+                    </div>
+                    <div class="bita-progress"><div class="bita-progress-bar" style="width:38%;background:#0369A1"></div></div>
+                    <div style="font-size:11px;color:var(--text-muted);margin-top:2px">120 comandos · 45 OK · 75 pend.</div>
+                  </div>
+                  <div>
+                    <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px">
+                      <span style="font-weight:600;color:var(--text-primary)">CIERRE DIARIO UNIX_2</span>
+                      <span style="color:var(--text-muted)">91%</span>
+                    </div>
+                    <div class="bita-progress"><div class="bita-progress-bar" style="width:91%;background:#16A34A"></div></div>
+                    <div style="font-size:11px;color:var(--text-muted);margin-top:2px">88 comandos · 80 OK · 8 pend.</div>
+                  </div>
+                </div>
+              </div>
+
+            </div>
+
+            <!-- Col der — feed de eventos -->
+            <div class="db-panel" style="position:sticky;top:0;">
+              <div class="db-panel-header">
+                <span class="db-panel-title">Eventos recientes</span>
+                <span style="font-size:11px;color:var(--text-muted)">Últimas 2h</span>
+              </div>
+              <div style="display:flex;flex-direction:column;">
+
+                <div class="db-event db-event-error">
+                  <div class="db-event-time">16:55</div>
+                  <div class="db-event-dot" style="background:#DC2626"></div>
+                  <div class="db-event-body">
+                    <div class="db-event-title">Error en comando</div>
+                    <div class="db-event-desc">100102 · TEST FEDE 20260326</div>
+                  </div>
+                </div>
+
+                <div class="db-event db-event-error">
+                  <div class="db-event-time">16:43</div>
+                  <div class="db-event-dot" style="background:#DC2626"></div>
+                  <div class="db-event-body">
+                    <div class="db-event-title">Error en comando</div>
+                    <div class="db-event-desc">100102 · TEST FEDE 20260326</div>
+                  </div>
+                </div>
+
+                <div class="db-event db-event-ok">
+                  <div class="db-event-time">16:19</div>
+                  <div class="db-event-dot" style="background:#16A34A"></div>
+                  <div class="db-event-body">
+                    <div class="db-event-title">Bitácora completada</div>
+                    <div class="db-event-desc">EJECUTAR COMANDO NORMAL</div>
+                  </div>
+                </div>
+
+                <div class="db-event db-event-info">
+                  <div class="db-event-time">15:30</div>
+                  <div class="db-event-dot" style="background:#0369A1"></div>
+                  <div class="db-event-body">
+                    <div class="db-event-title">Inicio de ejecución</div>
+                    <div class="db-event-desc">BATCH NOCHE SRV2</div>
+                  </div>
+                </div>
+
+                <div class="db-event db-event-warning">
+                  <div class="db-event-time">15:22</div>
+                  <div class="db-event-dot" style="background:#D97706"></div>
+                  <div class="db-event-body">
+                    <div class="db-event-title">Advertencia de duración</div>
+                    <div class="db-event-desc">TEST PARALELO 1C · +18min esperado</div>
+                  </div>
+                </div>
+
+                <div class="db-event db-event-error">
+                  <div class="db-event-time">15:10</div>
+                  <div class="db-event-dot" style="background:#DC2626"></div>
+                  <div class="db-event-body">
+                    <div class="db-event-title">Error en comando</div>
+                    <div class="db-event-desc">100102 · TEST FEDE 20260326</div>
+                  </div>
+                </div>
+
+                <div class="db-event db-event-ok">
+                  <div class="db-event-time">14:47</div>
+                  <div class="db-event-dot" style="background:#16A34A"></div>
+                  <div class="db-event-body">
+                    <div class="db-event-title">Bitácora completada</div>
+                    <div class="db-event-desc">CIERRE PARCIAL SRV PRUEBAS N</div>
+                  </div>
+                </div>
+
+                <div class="db-event db-event-info">
+                  <div class="db-event-time">14:30</div>
+                  <div class="db-event-dot" style="background:#0369A1"></div>
+                  <div class="db-event-body">
+                    <div class="db-event-title">Inicio de ejecución</div>
+                    <div class="db-event-desc">CIERRE DIARIO UNIX_2</div>
+                  </div>
+                </div>
+
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </div>
+
+      <!-- ======================================================
+           PAGE: BITÁCORAS (list view)
+      ====================================================== -->
+      <div class="demo-page" id="page-bitacoras" data-display="flex" style="display:none;flex-direction:column;height:100%;overflow:hidden;">
+
+        <!-- ── Page header ── -->
+        <div style="padding:20px 24px 0;background:var(--surface-card);border-bottom:1px solid var(--border-subtle);flex-shrink:0;">
+          <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:16px">
+            <div>
+              <div style="font-size:var(--text-xl);font-weight:600;color:var(--text-primary);margin-bottom:2px">Bitácoras</div>
+              <div style="font-size:var(--text-sm);color:var(--text-muted)">31 Mar 2026 · Actualizado hace 2 min</div>
+            </div>
+            <div style="display:flex;gap:8px">
+              <button class="btn btn-secondary btn-sm">↺ Refrescar</button>
+              <button class="btn btn-primary btn-sm">+ Nueva Bitácora</button>
+            </div>
+          </div>
+
+          <!-- Stats row -->
+          <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap">
+            <div class="bit-stat-pill bit-stat-all active" onclick="filterBitacoras('all',this)">
+              <span class="bit-stat-num">24</span>
+              <span class="bit-stat-label">Total</span>
+            </div>
+            <div class="bit-stat-pill bit-stat-running" onclick="filterBitacoras('running',this)">
+              <span style="width:7px;height:7px;border-radius:50%;background:var(--status-running);display:inline-block;animation:pulse 1.4s infinite"></span>
+              <span class="bit-stat-num">3</span>
+              <span class="bit-stat-label">En ejecución</span>
+            </div>
+            <div class="bit-stat-pill bit-stat-error" onclick="filterBitacoras('error',this)">
+              <span class="bit-stat-num">5</span>
+              <span class="bit-stat-label">Con errores</span>
+            </div>
+            <div class="bit-stat-pill bit-stat-warning" onclick="filterBitacoras('warning',this)">
+              <span class="bit-stat-num">4</span>
+              <span class="bit-stat-label">Con advertencias</span>
+            </div>
+            <div class="bit-stat-pill bit-stat-ok" onclick="filterBitacoras('ok',this)">
+              <span class="bit-stat-num">9</span>
+              <span class="bit-stat-label">Completadas</span>
+            </div>
+            <div class="bit-stat-pill bit-stat-neutral" onclick="filterBitacoras('pending',this)">
+              <span class="bit-stat-num">3</span>
+              <span class="bit-stat-label">Sin estado</span>
+            </div>
+          </div>
+
+          <!-- Toolbar -->
+          <div style="display:flex;align-items:center;gap:8px;padding-bottom:12px">
+            <div style="position:relative;flex:1;max-width:300px">
+              <span style="position:absolute;left:9px;top:50%;transform:translateY(-50%);color:var(--text-muted);font-size:13px">⌕</span>
+              <input placeholder="Buscar bitácora…" style="width:100%;height:30px;padding:0 10px 0 28px;border:1px solid var(--border-default);border-radius:var(--radius-md);font-size:12px;color:var(--text-primary);background:var(--surface-base);outline:none" />
+            </div>
+            <select style="height:30px;padding:0 24px 0 8px;border:1px solid var(--border-default);border-radius:var(--radius-md);font-size:12px;color:var(--text-secondary);background:var(--surface-base);outline:none">
+              <option>Ambiente: Todos</option>
+              <option>SRV PRUEBAS N</option>
+              <option>UNIX PRUEBAS</option>
+              <option>UNIX_2</option>
+            </select>
+            <div style="margin-left:auto;display:flex;gap:4px;align-items:center">
+              <span style="font-size:11px;color:var(--text-muted);margin-right:4px">Ordenar:</span>
+              <button class="sort-btn active" onclick="setSortBit('reciente',this)">Más reciente</button>
+              <button class="sort-btn" onclick="setSortBit('errores',this)">Con errores</button>
+              <button class="sort-btn" onclick="setSortBit('nombre',this)">Nombre A-Z</button>
+              <div style="width:1px;height:18px;background:var(--border-subtle);margin:0 4px"></div>
+              <button id="bitSelectAllBtn" class="sort-btn" onclick="toggleSelectAllBit(this)" style="margin-right:4px">☐ Seleccionar todo</button>
+              <button class="btn-icon" title="Vista tarjetas" style="background:var(--brand-secondary);color:#fff;border-color:var(--brand-secondary)">⊞</button>
+              <button class="btn-icon" title="Vista lista">☰</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- ── Bulk action toolbar ── -->
+        <div class="bulk-bar" id="bitBulkBar">
+          <span class="bulk-bar-count" id="bitBulkCount">0 seleccionadas</span>
+          <div class="bulk-bar-sep"></div>
+          <button class="bulk-bar-btn" onclick="bulkBit('ejecutar')">▶ Ejecutar</button>
+          <button class="bulk-bar-btn" onclick="bulkBit('detener')">⏹ Detener</button>
+          <button class="bulk-bar-btn" onclick="bulkBit('reintentar')">↺ Reintentar</button>
+          <div class="bulk-bar-sep"></div>
+          <button class="bulk-bar-btn danger" onclick="bulkBit('cancelar')">✕ Cancelar todas</button>
+          <button class="bulk-bar-dismiss" onclick="clearBitSelection()" title="Deseleccionar todo">✕</button>
+        </div>
+
+        <!-- ── Cards grid ── -->
+        <div style="flex:1;overflow-y:auto;padding:16px 24px 24px">
+          <div class="card-grid">
+
+            <div class="bita-card bita-error" data-bit-id="1" onclick="bitCardClick(1,this)">
+              <div class="bita-checkbox" onclick="event.stopPropagation();toggleBitSelect(1,this.closest('.bita-card'))">✓</div>
+              <div class="bita-card-header">
+                <div class="bita-name">TEST FEDE 20260326</div>
+                <button class="btn-icon btn-icon-sm" style="opacity:.5" onclick="event.stopPropagation()">···</button>
+              </div>
+              <div class="bita-meta">
+                <span>📡 SRV PRUEBAS N</span>
+                <span>26/3 12:42 → 30/3 16:55</span>
+              </div>
+              <div class="bita-badge-row">
+                <span class="badge badge-error">Con Errores</span>
+              </div>
+              <div class="bita-stats">
+                <div class="bita-stat"><span class="bita-stat-val">24</span><span class="bita-stat-lbl">Total</span></div>
+                <div class="bita-stat bita-ok"><span class="bita-stat-val">1</span><span class="bita-stat-lbl">OK</span></div>
+                <div class="bita-stat bita-err"><span class="bita-stat-val">1</span><span class="bita-stat-lbl">Error</span></div>
+                <div class="bita-stat bita-pend"><span class="bita-stat-val">1</span><span class="bita-stat-lbl">Pend.</span></div>
+              </div>
+              <div class="bita-actions">
+                <button class="btn-icon btn-icon-sm" title="Ejecutar">▶</button>
+                <button class="btn-icon btn-icon-sm" title="Detener">⏹</button>
+                <button class="btn-icon btn-icon-sm" title="Alertas">🔔</button>
+                <button class="btn-icon btn-icon-sm" title="Reintentar">↺</button>
+                <button class="btn-icon btn-icon-sm" title="Copiar">⧉</button>
+                <button class="btn-icon btn-icon-sm" title="Ver logs">⌕</button>
+              </div>
+            </div>
+
+            <div class="bita-card bita-ok" data-bit-id="2" onclick="bitCardClick(2,this)">
+              <div class="bita-checkbox" onclick="event.stopPropagation();toggleBitSelect(2,this.closest('.bita-card'))">✓</div>
+              <div class="bita-card-header">
+                <div class="bita-name">EJECUTAR COMANDO NORMAL</div>
+                <button class="btn-icon btn-icon-sm" style="opacity:.5" onclick="event.stopPropagation()">···</button>
+              </div>
+              <div class="bita-meta">
+                <span>📡 SRV PRUEBAS N</span>
+                <span>26/3 11:59 → 26/3 16:19</span>
+              </div>
+              <div class="bita-badge-row">
+                <span class="badge badge-success">Completado</span>
+              </div>
+              <div class="bita-stats">
+                <div class="bita-stat"><span class="bita-stat-val">5</span><span class="bita-stat-lbl">Total</span></div>
+                <div class="bita-stat bita-ok"><span class="bita-stat-val">3</span><span class="bita-stat-lbl">OK</span></div>
+                <div class="bita-stat bita-err"><span class="bita-stat-val">0</span><span class="bita-stat-lbl">Error</span></div>
+                <div class="bita-stat bita-pend"><span class="bita-stat-val">0</span><span class="bita-stat-lbl">Pend.</span></div>
+              </div>
+              <div class="bita-actions">
+                <button class="btn-icon btn-icon-sm" title="Ejecutar">▶</button>
+                <button class="btn-icon btn-icon-sm" title="Detener">⏹</button>
+                <button class="btn-icon btn-icon-sm" title="Alertas">🔔</button>
+                <button class="btn-icon btn-icon-sm" title="Reintentar">↺</button>
+                <button class="btn-icon btn-icon-sm" title="Copiar">⧉</button>
+                <button class="btn-icon btn-icon-sm" title="Ver logs">⌕</button>
+              </div>
+            </div>
+
+            <div class="bita-card bita-running" data-bit-id="3" onclick="bitCardClick(3,this)">
+              <div class="bita-checkbox" onclick="event.stopPropagation();toggleBitSelect(3,this.closest('.bita-card'))">✓</div>
+              <div class="bita-card-header">
+                <div class="bita-name">ACCUSYS ABS - POST CIERRES</div>
+                <button class="btn-icon btn-icon-sm" style="opacity:.5" onclick="event.stopPropagation()">···</button>
+              </div>
+              <div class="bita-meta">
+                <span>📡 UNIX PRUEBAS</span>
+                <span>16/3 01:00 → En ejecución…</span>
+              </div>
+              <div class="bita-badge-row">
+                <span class="badge badge-running">En Ejecución</span>
+                <span style="font-size:10px;color:var(--text-muted);margin-left:4px">~4m promedio</span>
+              </div>
+              <div class="bita-stats">
+                <div class="bita-stat"><span class="bita-stat-val">439</span><span class="bita-stat-lbl">Total</span></div>
+                <div class="bita-stat bita-ok"><span class="bita-stat-val">14</span><span class="bita-stat-lbl">OK</span></div>
+                <div class="bita-stat bita-err"><span class="bita-stat-val">1</span><span class="bita-stat-lbl">Error</span></div>
+                <div class="bita-stat bita-pend"><span class="bita-stat-val">14</span><span class="bita-stat-lbl">Pend.</span></div>
+              </div>
+              <div class="bita-progress">
+                <div class="bita-progress-bar" style="width:62%"></div>
+              </div>
+              <div class="bita-actions">
+                <button class="btn-icon btn-icon-sm" title="Ejecutar">▶</button>
+                <button class="btn-icon btn-icon-sm" title="Detener">⏹</button>
+                <button class="btn-icon btn-icon-sm" title="Alertas">🔔</button>
+                <button class="btn-icon btn-icon-sm" title="Reintentar">↺</button>
+                <button class="btn-icon btn-icon-sm" title="Copiar">⧉</button>
+                <button class="btn-icon btn-icon-sm" title="Ver logs">⌕</button>
+              </div>
+            </div>
+
+            <div class="bita-card bita-warning" data-bit-id="4" onclick="bitCardClick(4,this)">
+              <div class="bita-checkbox" onclick="event.stopPropagation();toggleBitSelect(4,this.closest('.bita-card'))">✓</div>
+              <div class="bita-card-header">
+                <div class="bita-name">TEST PARALELO 1C</div>
+                <button class="btn-icon btn-icon-sm" style="opacity:.5" onclick="event.stopPropagation()">···</button>
+              </div>
+              <div class="bita-meta">
+                <span>📡 UNIX_2</span>
+                <span>17/3 18:59 → 17/3 15:36</span>
+              </div>
+              <div class="bita-badge-row">
+                <span class="badge badge-warning">Con Advertencias</span>
+              </div>
+              <div class="bita-stats">
+                <div class="bita-stat"><span class="bita-stat-val">3</span><span class="bita-stat-lbl">Total</span></div>
+                <div class="bita-stat bita-ok"><span class="bita-stat-val">3</span><span class="bita-stat-lbl">OK</span></div>
+                <div class="bita-stat bita-err"><span class="bita-stat-val">3</span><span class="bita-stat-lbl">Error</span></div>
+                <div class="bita-stat bita-pend"><span class="bita-stat-val">0</span><span class="bita-stat-lbl">Pend.</span></div>
+              </div>
+              <div class="bita-actions">
+                <button class="btn-icon btn-icon-sm" title="Ejecutar">▶</button>
+                <button class="btn-icon btn-icon-sm" title="Detener">⏹</button>
+                <button class="btn-icon btn-icon-sm" title="Alertas">🔔</button>
+                <button class="btn-icon btn-icon-sm" title="Reintentar">↺</button>
+                <button class="btn-icon btn-icon-sm" title="Copiar">⧉</button>
+                <button class="btn-icon btn-icon-sm" title="Ver logs">⌕</button>
+              </div>
+            </div>
+
+            <div class="bita-card bita-neutral" data-bit-id="5" onclick="bitCardClick(5,this)">
+              <div class="bita-checkbox" onclick="event.stopPropagation();toggleBitSelect(5,this.closest('.bita-card'))">✓</div>
+              <div class="bita-card-header">
+                <div class="bita-name">BITÁCORA BUGGATTI</div>
+                <button class="btn-icon btn-icon-sm" style="opacity:.5" onclick="event.stopPropagation()">···</button>
+              </div>
+              <div class="bita-meta">
+                <span>📡 SRV PRUEBAS N</span>
+                <span>6/3 12:42 → 11/3 15:25</span>
+              </div>
+              <div class="bita-badge-row">
+                <span class="badge badge-blocked">Sin Estado</span>
+              </div>
+              <div class="bita-stats">
+                <div class="bita-stat"><span class="bita-stat-val">0</span><span class="bita-stat-lbl">Total</span></div>
+                <div class="bita-stat bita-ok"><span class="bita-stat-val">27</span><span class="bita-stat-lbl">OK</span></div>
+                <div class="bita-stat bita-err"><span class="bita-stat-val">0</span><span class="bita-stat-lbl">Error</span></div>
+                <div class="bita-stat bita-pend"><span class="bita-stat-val">0</span><span class="bita-stat-lbl">Pend.</span></div>
+              </div>
+              <div class="bita-actions">
+                <button class="btn-icon btn-icon-sm" title="Ejecutar">▶</button>
+                <button class="btn-icon btn-icon-sm" title="Detener">⏹</button>
+                <button class="btn-icon btn-icon-sm" title="Alertas">🔔</button>
+                <button class="btn-icon btn-icon-sm" title="Reintentar">↺</button>
+                <button class="btn-icon btn-icon-sm" title="Copiar">⧉</button>
+                <button class="btn-icon btn-icon-sm" title="Ver logs">⌕</button>
+              </div>
+            </div>
+
+            <div class="bita-card bita-pending" data-bit-id="6" onclick="bitCardClick(6,this)">
+              <div class="bita-checkbox" onclick="event.stopPropagation();toggleBitSelect(6,this.closest('.bita-card'))">✓</div>
+              <div class="bita-card-header">
+                <div class="bita-name">TEST PARA A1</div>
+                <button class="btn-icon btn-icon-sm" style="opacity:.5" onclick="event.stopPropagation()">···</button>
+              </div>
+              <div class="bita-meta">
+                <span>📡 UNIX_2</span>
+                <span>4/3 18:59 → 11/3 15:37</span>
+              </div>
+              <div class="bita-badge-row">
+                <span class="badge badge-pending">Pendiente</span>
+              </div>
+              <div class="bita-stats">
+                <div class="bita-stat"><span class="bita-stat-val">0</span><span class="bita-stat-lbl">Total</span></div>
+                <div class="bita-stat bita-ok"><span class="bita-stat-val">4</span><span class="bita-stat-lbl">OK</span></div>
+                <div class="bita-stat bita-err"><span class="bita-stat-val">5</span><span class="bita-stat-lbl">Error</span></div>
+                <div class="bita-stat bita-pend"><span class="bita-stat-val">0</span><span class="bita-stat-lbl">Pend.</span></div>
+              </div>
+              <div class="bita-actions">
+                <button class="btn-icon btn-icon-sm" title="Ejecutar">▶</button>
+                <button class="btn-icon btn-icon-sm" title="Detener">⏹</button>
+                <button class="btn-icon btn-icon-sm" title="Alertas">🔔</button>
+                <button class="btn-icon btn-icon-sm" title="Reintentar">↺</button>
+                <button class="btn-icon btn-icon-sm" title="Copiar">⧉</button>
+                <button class="btn-icon btn-icon-sm" title="Ver logs">⌕</button>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </div>
+
+      <!-- ======================================================
+           PAGE: SERVICIOS
+      ====================================================== -->
+      <div class="demo-page" id="page-servicios">
+        <div class="section-header">
+          <div>
+            <div class="section-title">Servicios</div>
+            <div class="section-sub">Administración → Servicios</div>
+          </div>
+          <div style="display:flex;gap:8px">
+            <button class="btn btn-secondary btn-sm">↺ Refrescar</button>
+            <button class="btn btn-primary btn-sm">+ Nuevo</button>
+            <button class="btn btn-secondary btn-sm">? Ayuda</button>
+          </div>
+        </div>
+        <div class="data-table-wrap">
+          <div class="table-toolbar">
+            <div class="table-search">
+              <span>⌕</span>
+              <input placeholder="Buscar servicio…" />
+            </div>
+            <button class="btn btn-secondary btn-sm">▽ Filtros</button>
+          </div>
+          <table>
+            <thead>
+              <tr>
+                <th>Nombre</th>
+                <th>Descripción</th>
+                <th>Es DBMS</th>
+                <th>Estado</th>
+                <th>Acciones</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td>AS400</td><td>Servicio AS400</td>
+                <td><span style="color:var(--gray-400)">—</span></td>
+                <td><span class="badge badge-success">Activo</span></td>
+                <td style="display:flex;gap:4px"><button class="btn-icon">✎</button><button class="btn-icon" style="color:var(--status-error)">✕</button></td></tr>
+              <tr><td>DISTRIBUIDOR</td><td>Manejador de procesos de transferencia</td>
+                <td><span style="color:var(--gray-400)">—</span></td>
+                <td><span class="badge badge-blocked">Bloqueado</span></td>
+                <td style="display:flex;gap:4px"><button class="btn-icon">✎</button><button class="btn-icon" style="color:var(--status-error)">✕</button></td></tr>
+              <tr><td>ORACLE</td><td>Manejador de base de datos Oracle</td>
+                <td><span style="color:var(--status-success)">✓</span></td>
+                <td><span class="badge badge-success">Activo</span></td>
+                <td style="display:flex;gap:4px"><button class="btn-icon">✎</button><button class="btn-icon" style="color:var(--status-error)">✕</button></td></tr>
+              <tr><td>SQL SERVER</td><td>Manejador de base de datos sobre Windows</td>
+                <td><span style="color:var(--status-success)">✓</span></td>
+                <td><span class="badge badge-success">Activo</span></td>
+                <td style="display:flex;gap:4px"><button class="btn-icon">✎</button><button class="btn-icon" style="color:var(--status-error)">✕</button></td></tr>
+              <tr><td>SYBASE</td><td>Manejador de base de datos sobre UNIX</td>
+                <td><span style="color:var(--status-success)">✓</span></td>
+                <td><span class="badge badge-success">Activo</span></td>
+                <td style="display:flex;gap:4px"><button class="btn-icon">✎</button><button class="btn-icon" style="color:var(--status-error)">✕</button></td></tr>
+              <tr><td>UNIX</td><td>Sistema operativo</td>
+                <td><span style="color:var(--gray-400)">—</span></td>
+                <td><span class="badge badge-success">Activo</span></td>
+                <td style="display:flex;gap:4px"><button class="btn-icon">✎</button><button class="btn-icon" style="color:var(--status-error)">✕</button></td></tr>
+              <tr><td>WINDOWS</td><td>Sistema operativo</td>
+                <td><span style="color:var(--gray-400)">—</span></td>
+                <td><span class="badge badge-success">Activo</span></td>
+                <td style="display:flex;gap:4px"><button class="btn-icon">✎</button><button class="btn-icon" style="color:var(--status-error)">✕</button></td></tr>
+            </tbody>
+          </table>
+          <div class="table-footer">
+            <span>Página 1 de 1 (20 elementos)</span>
+            <div class="pagination">
+              <button class="page-btn active">1</button>
+            </div>
+            <div style="display:flex;align-items:center;gap:8px">
+              <span>Filas por página:</span>
+              <select class="form-select" style="padding:3px 24px 3px 8px;font-size:12px">
+                <option>10</option><option selected>20</option><option>50</option>
+              </select>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ======================================================
+           PAGE: USUARIOS
+      ====================================================== -->
+      <div class="demo-page" id="page-usuarios">
+        <div class="section-header">
+          <div>
+            <div class="section-title">Usuarios</div>
+            <div class="section-sub">Seguridad → Usuarios</div>
+          </div>
+          <div style="display:flex;gap:8px">
+            <button class="btn btn-secondary btn-sm">↺ Refrescar</button>
+            <button class="btn btn-primary btn-sm">+ Nuevo</button>
+            <button class="btn btn-secondary btn-sm">📄 Ver Reporte</button>
+          </div>
+        </div>
+        <div class="data-table-wrap">
+          <div class="table-toolbar">
+            <div class="table-search">
+              <span>⌕</span>
+              <input placeholder="Buscar usuario…" />
+            </div>
+            <button class="btn btn-secondary btn-sm">▽ Filtros</button>
+          </div>
+          <table>
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Apellido</th>
+                <th>Nombre</th>
+                <th>E-mail</th>
+                <th>Estado</th>
+                <th>Acciones</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td>ADMINISTRADOR</td><td>ADMINISTRADOR</td><td>PROBATCH</td><td>informes.sistemas@nuevobersa.com.ar</td><td><span class="badge badge-success">Activo</span></td><td style="display:flex;gap:4px"><button class="btn-icon">✎</button><button class="btn-icon">🔑</button></td></tr>
+              <tr><td>BGARCIA</td><td>GARCIA</td><td>BRENDA SILVINA</td><td>brenda.garcia@nuevobersa.com.ar</td><td><span class="badge badge-success">Activo</span></td><td style="display:flex;gap:4px"><button class="btn-icon">✎</button><button class="btn-icon">🔑</button></td></tr>
+              <tr><td>DIEGOTRIPODI</td><td>Tripodi</td><td>Diego</td><td>diego.tripodi@accusys.com.ar</td><td><span class="badge badge-success">Activo</span></td><td style="display:flex;gap:4px"><button class="btn-icon">✎</button><button class="btn-icon">🔑</button></td></tr>
+              <tr><td>DJAURENA</td><td>JAURENA</td><td>DANTE</td><td>dante.jaurena@nuevobersa.com.ar</td><td><span class="badge badge-blocked">Bloqueado</span></td><td style="display:flex;gap:4px"><button class="btn-icon">✎</button><button class="btn-icon">🔑</button></td></tr>
+              <tr><td>EFALCONIER</td><td>FALCONIER</td><td>ELVIO</td><td>elvio.falconier@nuevobersa.com.ar</td><td><span class="badge badge-success">Activo</span></td><td style="display:flex;gap:4px"><button class="btn-icon">✎</button><button class="btn-icon">🔑</button></td></tr>
+              <tr><td>FHOURTHANE</td><td>HOURTHANE</td><td>FRANCISCO</td><td>francisco.hourthane@nuevobersa.com.ar</td><td><span class="badge badge-success">Activo</span></td><td style="display:flex;gap:4px"><button class="btn-icon">✎</button><button class="btn-icon">🔑</button></td></tr>
+              <tr><td>LBUTTAZZONI</td><td>BUTTAZZONI</td><td>ADRIANO</td><td>luis.buttazzoni@bancoentrerios.com.ar</td><td><span class="badge badge-success">Activo</span></td><td style="display:flex;gap:4px"><button class="btn-icon">✎</button><button class="btn-icon">🔑</button></td></tr>
+            </tbody>
+          </table>
+          <div class="table-footer">
+            <span>Página 1 de 2 (29 elementos)</span>
+            <div class="pagination">
+              <button class="page-btn">‹</button>
+              <button class="page-btn active">1</button>
+              <button class="page-btn">2</button>
+              <button class="page-btn">›</button>
+            </div>
+            <div style="display:flex;align-items:center;gap:8px">
+              <span>Filas por página:</span>
+              <select class="form-select" style="padding:3px 24px 3px 8px;font-size:12px">
+                <option>10</option><option selected>20</option><option>50</option>
+              </select>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ======================================================
+           PAGE: REPORTES
+      ====================================================== -->
+      <div class="demo-page" id="page-reportes">
+        <div class="section-header">
+          <div>
+            <div class="section-title">Reportes</div>
+            <div class="section-sub">Seleccioná el tipo de reporte y configurá los filtros</div>
+          </div>
+        </div>
+
+        <!-- Buscador de reportes -->
+        <div style="margin-bottom:var(--sp-6)">
+          <div class="table-search" style="max-width:400px;padding:10px 14px;font-size:14px">
+            <span style="font-size:16px">⌕</span>
+            <input placeholder="Buscar reporte…" style="font-size:14px" oninput="filterReports(this.value)" />
+          </div>
+        </div>
+
+        <!-- Grupo: Ejecución -->
+        <div class="report-group" data-group="ejecucion">
+          <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-secondary);margin-bottom:var(--sp-3)">Ejecución</div>
+          <div class="report-grid">
+            <div class="report-card" onclick="openReport('Bitácoras')"><div class="report-icon">📋</div><div class="report-name">Bitácoras</div><div class="report-desc">Estado y ejecución de bitácoras</div></div>
+            <div class="report-card" onclick="openReport('Lotes')"><div class="report-icon">📦</div><div class="report-name">Lotes</div><div class="report-desc">Detalle de lotes ejecutados</div></div>
+            <div class="report-card" onclick="openReport('Composición Lotes')"><div class="report-icon">🗂️</div><div class="report-name">Composición Lotes</div><div class="report-desc">Composición interna de lotes</div></div>
+            <div class="report-card" onclick="openReport('Comandos')"><div class="report-icon">⌨️</div><div class="report-name">Comandos</div><div class="report-desc">Historial de comandos ejecutados</div></div>
+            <div class="report-card" onclick="openReport('Ejecución')"><div class="report-icon">▶️</div><div class="report-name">Ejecución</div><div class="report-desc">Resumen general de ejecuciones</div></div>
+            <div class="report-card" onclick="openReport('Ejecución Consolidada')"><div class="report-icon">📈</div><div class="report-name">Ejecución Consolidada</div><div class="report-desc">Vista consolidada por período</div></div>
+            <div class="report-card" onclick="openReport('Ejecuciones Bitácoras')"><div class="report-icon">🔁</div><div class="report-name">Ejecuciones Bitácoras</div><div class="report-desc">Historial de ejecuciones por bitácora</div></div>
+            <div class="report-card" onclick="openReport('Bitácoras Activas')"><div class="report-icon">🟢</div><div class="report-name">Bitácoras Activas</div><div class="report-desc">Bitácoras en ejecución ahora</div></div>
+          </div>
+        </div>
+
+        <!-- Grupo: Análisis -->
+        <div class="report-group" data-group="analisis" style="margin-top:var(--sp-6)">
+          <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-secondary);margin-bottom:var(--sp-3)">Análisis y Auditoría</div>
+          <div class="report-grid">
+            <div class="report-card" onclick="openReport('Log Operaciones')"><div class="report-icon">📝</div><div class="report-name">Log Operaciones</div><div class="report-desc">Registro de todas las operaciones</div></div>
+            <div class="report-card" onclick="openReport('Tiempo Excedido')"><div class="report-icon">⏱️</div><div class="report-name">Tiempo Excedido</div><div class="report-desc">Jobs que superaron el tiempo límite</div></div>
+            <div class="report-card" onclick="openReport('Demora Ejecución')"><div class="report-icon">🐢</div><div class="report-name">Demora Ejecución</div><div class="report-desc">Análisis de demoras por bitácora</div></div>
+            <div class="report-card" onclick="openReport('Comparador de Bitácoras')"><div class="report-icon">⚖️</div><div class="report-name">Comparador de Bitácoras</div><div class="report-desc">Compara ejecuciones entre períodos</div></div>
+            <div class="report-card" onclick="openReport('Modificaciones Realizadas')"><div class="report-icon">✏️</div><div class="report-name">Modificaciones Realizadas</div><div class="report-desc">Auditoría de cambios en el sistema</div></div>
+            <div class="report-card" onclick="openReport('Bitácora Eventos')"><div class="report-icon">📡</div><div class="report-name">Bitácora Eventos</div><div class="report-desc">Eventos registrados por bitácora</div></div>
+          </div>
+        </div>
+
+        <!-- Grupo: Recursos -->
+        <div class="report-group" data-group="recursos" style="margin-top:var(--sp-6)">
+          <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-secondary);margin-bottom:var(--sp-3)">Recursos y Operadores</div>
+          <div class="report-grid">
+            <div class="report-card" onclick="openReport('Comandos Paralelizados')"><div class="report-icon">⚡</div><div class="report-name">Comandos Paralelizados</div><div class="report-desc">Uso de paralelismo en ejecución</div></div>
+            <div class="report-card" onclick="openReport('Comando Recursos')"><div class="report-icon">🖥️</div><div class="report-name">Comando Recursos</div><div class="report-desc">Recursos utilizados por comando</div></div>
+            <div class="report-card" onclick="openReport('Lote Comando')"><div class="report-icon">🔗</div><div class="report-name">Lote Comando</div><div class="report-desc">Relación entre lotes y comandos</div></div>
+            <div class="report-card" onclick="openReport('Bitácora Operadores')"><div class="report-icon">👤</div><div class="report-name">Bitácora Operadores</div><div class="report-desc">Operadores asignados por bitácora</div></div>
+            <div class="report-card" onclick="openReport('Operadores Asignados')"><div class="report-icon">👥</div><div class="report-name">Operadores Asignados</div><div class="report-desc">Asignación de operadores activos</div></div>
+          </div>
+        </div>
+
+        <!-- Grupo: Configuración -->
+        <div class="report-group" data-group="config" style="margin-top:var(--sp-6)">
+          <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-secondary);margin-bottom:var(--sp-3)">Configuración</div>
+          <div class="report-grid">
+            <div class="report-card" onclick="openReport('Calendarización')"><div class="report-icon">📅</div><div class="report-name">Calendarización</div><div class="report-desc">Configuración de calendarios</div></div>
+            <div class="report-card" onclick="openReport('Dependencias')"><div class="report-icon">🔀</div><div class="report-name">Dependencias</div><div class="report-desc">Mapa de dependencias entre jobs</div></div>
+            <div class="report-card" onclick="openReport('Exclusiones')"><div class="report-icon">🚫</div><div class="report-name">Exclusiones</div><div class="report-desc">Reglas de exclusión configuradas</div></div>
+            <div class="report-card" onclick="openReport('Variables')"><div class="report-icon">🔤</div><div class="report-name">Variables</div><div class="report-desc">Variables definidas en el sistema</div></div>
+            <div class="report-card" onclick="openReport('Monitor de Procesos')"><div class="report-icon">📟</div><div class="report-name">Monitor de Procesos</div><div class="report-desc">Estado de procesos en tiempo real</div></div>
+            <div class="report-card" onclick="openReport('Log Comandos Planificados')"><div class="report-icon">🗓️</div><div class="report-name">Log Comandos Planificados</div><div class="report-desc">Historial de comandos planificados</div></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ======================================================
+           PAGE: DESIGN TOKENS
+      ====================================================== -->
+      <div class="demo-page" id="page-tokens">
+        <div class="section-header">
+          <div class="section-title">Design Tokens</div>
+          <div class="section-sub">Fundamentos del sistema visual unificado</div>
+        </div>
+
+        <div class="doc-card">
+          <div class="doc-card-header"><div class="doc-card-title">Colores de Estado (Semánticos)</div></div>
+          <div class="doc-card-body">
+            <div class="token-grid">
+              <div class="swatch"><div class="swatch-color" style="background:#22C55E"></div><div class="swatch-label"><div class="swatch-name">Success</div><div class="swatch-hex">#22C55E</div></div></div>
+              <div class="swatch"><div class="swatch-color" style="background:#EF4444"></div><div class="swatch-label"><div class="swatch-name">Error</div><div class="swatch-hex">#EF4444</div></div></div>
+              <div class="swatch"><div class="swatch-color" style="background:#F59E0B"></div><div class="swatch-label"><div class="swatch-name">Warning</div><div class="swatch-hex">#F59E0B</div></div></div>
+              <div class="swatch"><div class="swatch-color" style="background:#3B82F6"></div><div class="swatch-label"><div class="swatch-name">Info</div><div class="swatch-hex">#3B82F6</div></div></div>
+              <div class="swatch"><div class="swatch-color" style="background:#0EA5E9"></div><div class="swatch-label"><div class="swatch-name">Running</div><div class="swatch-hex">#0EA5E9</div></div></div>
+              <div class="swatch"><div class="swatch-color" style="background:#A78BFA"></div><div class="swatch-label"><div class="swatch-name">Pending</div><div class="swatch-hex">#A78BFA</div></div></div>
+              <div class="swatch"><div class="swatch-color" style="background:#94A3B8"></div><div class="swatch-label"><div class="swatch-name">Blocked</div><div class="swatch-hex">#94A3B8</div></div></div>
+            </div>
+            <div class="doc-card-note">Reemplaza: los colores ad-hoc de las cards de ProBatch Y el texto "A-ACTIVO / B-BLOQUEADO" de las tablas de Accusys.</div>
+          </div>
+        </div>
+
+        <div class="doc-card">
+          <div class="doc-card-header"><div class="doc-card-title">Colores de Marca</div></div>
+          <div class="doc-card-body">
+            <div class="token-grid">
+              <div class="swatch"><div class="swatch-color" style="background:#1A3A5C"></div><div class="swatch-label"><div class="swatch-name">Brand Primary</div><div class="swatch-hex">#1A3A5C</div></div></div>
+              <div class="swatch"><div class="swatch-color" style="background:#0D6EFD"></div><div class="swatch-label"><div class="swatch-name">Brand Secondary</div><div class="swatch-hex">#0D6EFD</div></div></div>
+              <div class="swatch"><div class="swatch-color" style="background:#F59E0B"></div><div class="swatch-label"><div class="swatch-name">Brand Accent</div><div class="swatch-hex">#F59E0B</div></div></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="doc-card">
+          <div class="doc-card-header"><div class="doc-card-title">Escala de Grises</div></div>
+          <div class="doc-card-body">
+            <div class="token-grid">
+              <div class="swatch"><div class="swatch-color" style="background:#F8FAFC;border-bottom:1px solid #eee"></div><div class="swatch-label"><div class="swatch-name">Gray 50</div><div class="swatch-hex">#F8FAFC</div></div></div>
+              <div class="swatch"><div class="swatch-color" style="background:#E2E8F0"></div><div class="swatch-label"><div class="swatch-name">Gray 200</div><div class="swatch-hex">#E2E8F0</div></div></div>
+              <div class="swatch"><div class="swatch-color" style="background:#94A3B8"></div><div class="swatch-label"><div class="swatch-name">Gray 400</div><div class="swatch-hex">#94A3B8</div></div></div>
+              <div class="swatch"><div class="swatch-color" style="background:#64748B"></div><div class="swatch-label"><div class="swatch-name">Gray 500</div><div class="swatch-hex">#64748B</div></div></div>
+              <div class="swatch"><div class="swatch-color" style="background:#1E293B"></div><div class="swatch-label"><div class="swatch-name">Gray 800</div><div class="swatch-hex">#1E293B</div></div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ======================================================
+           PAGE: COMPONENTES
+      ====================================================== -->
+      <div class="demo-page" id="page-componentes">
+        <div class="section-header">
+          <div class="section-title">Componentes</div>
+          <div class="section-sub">Inventario del sistema de componentes unificado</div>
+        </div>
+
+        <!-- Buttons -->
+        <div class="doc-card">
+          <div class="doc-card-header">
+            <div class="doc-card-title">Botones <span class="chip new">unificado</span></div>
+          </div>
+          <div class="doc-card-body">
+            <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center">
+              <button class="btn btn-primary">Primary</button>
+              <button class="btn btn-secondary">Secondary</button>
+              <button class="btn btn-danger">Danger</button>
+              <button class="btn btn-primary btn-sm">Primary SM</button>
+              <button class="btn btn-secondary btn-sm">Secondary SM</button>
+              <button class="btn-icon">✎</button>
+              <button class="btn-icon">⌕</button>
+              <button class="btn-icon">↺</button>
+              <button class="btn-icon">▶</button>
+            </div>
+            <div class="doc-card-note">Los botones de texto plano de Accusys (REFRESCAR | NUEVO | AYUDA) y los íconos sin etiqueta de ProBatch se reemplazan por este sistema consistente.</div>
+          </div>
+        </div>
+
+        <!-- Badges -->
+        <div class="doc-card">
+          <div class="doc-card-header">
+            <div class="doc-card-title">Badges de Estado <span class="chip new">unificado</span></div>
+          </div>
+          <div class="doc-card-body">
+            <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+              <span class="badge badge-success">Completado</span>
+              <span class="badge badge-error">Con Errores</span>
+              <span class="badge badge-warning">Con Advertencias</span>
+              <span class="badge badge-running">En Ejecución</span>
+              <span class="badge badge-pending">Pendiente</span>
+              <span class="badge badge-blocked">Bloqueado</span>
+              <span class="badge badge-info">Info</span>
+            </div>
+            <div class="doc-card-note">Reemplaza los colores de borde de cards (ProBatch) y los textos "A-ACTIVO / B-BLOQUEADO" (Accusys) con un sistema visual semántico.</div>
+          </div>
+        </div>
+
+        <!-- Forms -->
+        <div class="doc-card">
+          <div class="doc-card-header">
+            <div class="doc-card-title">Formularios <span class="chip changed">normalizado</span></div>
+          </div>
+          <div class="doc-card-body">
+            <div style="max-width:480px;display:flex;flex-direction:column;gap:16px">
+              <div class="form-row">
+                <div class="form-group">
+                  <label class="form-label">Nombre</label>
+                  <input class="form-input" placeholder="Ej: SERVICIO_ORACLE" />
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Estado</label>
+                  <select class="form-select">
+                    <option>Activo</option>
+                    <option>Bloqueado</option>
+                  </select>
+                </div>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Descripción</label>
+                <input class="form-input" placeholder="Descripción del servicio…" />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Navigation -->
+        <div class="doc-card">
+          <div class="doc-card-header">
+            <div class="doc-card-title">Navegación <span class="chip new">unificado</span></div>
+          </div>
+          <div class="doc-card-body">
+            <p style="font-size:13px;color:var(--text-secondary);margin-bottom:12px">
+              El sidebar izquierdo reemplaza ambos patrones: el toolbar de íconos de ProBatch y el sidebar de texto de Accusys. Soporta:
+            </p>
+            <ul style="font-size:13px;color:var(--text-secondary);line-height:2;padding-left:20px">
+              <li>Grupos colapsables por sección</li>
+              <li>Indicadores de badge para alertas en tiempo real</li>
+              <li>Estado activo con acento de color</li>
+              <li>Búsqueda integrada en el sidebar</li>
+              <li>Compatible con colapso a solo íconos (futuro)</li>
+            </ul>
+          </div>
+        </div>
+
+      </div>
+
+    </div><!-- /content-area -->
+  </div><!-- /main-content -->
+
+  <!-- NOTIFICATION PANEL -->
+  <aside class="notification-panel" id="notifPanel">
+    <div class="notif-header">
+      <span class="notif-title">Notificaciones</span>
+      <button class="btn-icon" onclick="toggleNotif()" style="font-size:11px">✕</button>
+    </div>
+    <div class="notif-tabs">
+      <div class="notif-tab active">Propias</div>
+      <div class="notif-tab">Todas</div>
+    </div>
+    <div class="notif-list">
+      <div class="notif-group"><div class="notif-group-label">TEST FEDE 20260326</div></div>
+      <div style="padding: 4px 16px 4px; font-size:11px;color:var(--text-secondary)">▸ Inst-1 [Inst-1]</div>
+      <div style="padding: 2px 16px 4px; font-size:11px;color:var(--text-secondary)">▸ 100102 - COMANDO 100102 PRUEBA</div>
+      <div class="notif-item error">
+        <div class="notif-job">Error al ejecutar comando</div>
+        <div class="notif-msg">'100102 - COMANDO 100102 PRUEBA' Error: -1</div>
+        <div class="notif-time">30/3/2026 16:40:05</div>
+      </div>
+      <div class="notif-item error">
+        <div class="notif-job">Error al ejecutar comando</div>
+        <div class="notif-msg">'100102 - COMANDO 100102 PRUEBA' Error: -1</div>
+        <div class="notif-time">30/3/2026 16:42:33</div>
+      </div>
+      <div class="notif-item error">
+        <div class="notif-job">Error al ejecutar comando</div>
+        <div class="notif-msg">'100102 - COMANDO 100102 PRUEBA' Error: -1</div>
+        <div class="notif-time">30/3/2026 16:43:28</div>
+      </div>
+      <div class="notif-item error">
+        <div class="notif-job">Error al ejecutar comando</div>
+        <div class="notif-msg">'100102 - COMANDO 100102 PRUEBA' Error: -1</div>
+        <div class="notif-time">30/3/2026 16:55:22</div>
+      </div>
+    </div>
+  </aside>
+
+</div><!-- /app-body -->
+
+<script>
+  let selectedCards = new Set();
+
+  function toggleCard(card) {
+    if (card.classList.contains('selected')) {
+      card.classList.remove('selected');
+      card.querySelector('.card-checkbox').checked = false;
+      selectedCards.delete(card);
+    } else {
+      card.classList.add('selected');
+      card.querySelector('.card-checkbox').checked = true;
+      selectedCards.add(card);
+    }
+    updateBulkToolbar();
+  }
+
+  function updateBulkToolbar() {
+    const toolbar = document.getElementById('bulkToolbar');
+    const count = document.getElementById('bulkCount');
+    if (selectedCards.size > 0) {
+      toolbar.classList.add('visible');
+      count.textContent = selectedCards.size + ' seleccionada' + (selectedCards.size > 1 ? 's' : '');
+    } else {
+      toolbar.classList.remove('visible');
+    }
+  }
+
+  function clearSelection() {
+    selectedCards.forEach(card => {
+      card.classList.remove('selected');
+      card.querySelector('.card-checkbox').checked = false;
+    });
+    selectedCards.clear();
+    updateBulkToolbar();
+  }
+
+  function filterReports(val) {
+    const q = val.toLowerCase();
+    document.querySelectorAll('.report-card').forEach(card => {
+      const text = card.textContent.toLowerCase();
+      card.classList.toggle('hidden', q.length > 0 && !text.includes(q));
+    });
+    document.querySelectorAll('.report-group').forEach(group => {
+      const visible = [...group.querySelectorAll('.report-card')].some(c => !c.classList.contains('hidden'));
+      group.style.display = visible ? '' : 'none';
+    });
+  }
+
+  function openReport(name) {
+    alert('Abriendo reporte: ' + name);
+  }
+
+  function bulkAction(action) {
+    const names = [...selectedCards].map(c => c.querySelector('.card-title').textContent);
+    alert('Acción "' + action + '" sobre:\n• ' + names.join('\n• '));
+    clearSelection();
+  }
+
+  function showPage(name, tab) {
+    document.querySelectorAll('.demo-page').forEach(p => p.classList.remove('active'));
+    document.querySelectorAll('.demo-nav-tab').forEach(t => t.classList.remove('active'));
+    document.getElementById('page-' + name).classList.add('active');
+    tab.classList.add('active');
+  }
+
+  function toggleNotif() {
+    document.getElementById('notifPanel').classList.toggle('collapsed');
+  }
+
+  // ── Flyout data ──────────────────────────────────────────────
+  const flyoutData = {
+    batch: {
+      icon: '⚡', title: 'Batch',
+      items: [
+        { label: 'Lotes' },
+        { label: 'Plantillas' },
+        { label: 'Clonar Bitácora' },
+        { group: 'Dependencias' },
+        { label: 'Dep. Lote' },
+        { label: 'Dep. Lote-Comando' },
+        { label: 'Dep. Comando' },
+        { label: 'Dep. Recursos' },
+        { label: 'Dep. Plantilla-Bitácora' },
+        { group: 'Herramientas' },
+        { label: 'Claves Automáticas' },
+        { label: 'Liberar Operador' },
+        { label: 'Importar/Exportar' },
+        { label: 'Gantt y Camino Crítico' },
+      ]
+    },
+    planificador: {
+      icon: '📅', title: 'Planificador',
+      items: [
+        { label: 'Planificación de Procesos' },
+        { label: 'Monitor de Procesos' },
+        { label: 'Monitor de Recurrencias' },
+      ]
+    },
+    ejecucion: {
+      icon: '▶️', title: 'Ejecución',
+      items: [
+        { label: 'Comandos' },
+        { label: 'Estados' },
+        { label: 'Batch' },
+      ]
+    },
+    admin: {
+      icon: '⚙️', title: 'Administración',
+      items: [
+        { label: 'Servicios', page: 'servicios' },
+        { label: 'Ambientes' },
+        { label: 'Grupos de Comandos' },
+        { label: 'Tipos de Comandos' },
+        { label: 'Grupo de Notificaciones' },
+        { label: 'Variables' },
+        { label: 'Parámetros' },
+        { label: 'Expresiones Regulares' },
+        { label: 'Comandos' },
+        { label: 'Feriados' },
+        { label: 'Notificaciones' },
+        { label: 'Recursos' },
+        { label: 'Interfaz' },
+      ]
+    },
+    seguridad: {
+      icon: '🔒', title: 'Seguridad',
+      items: [
+        { label: 'Usuarios', page: 'usuarios' },
+        { label: 'Perfiles' },
+        { label: 'Permisos' },
+        { label: 'Claves' },
+        { label: 'Usuarios de Ambiente' },
+        { label: 'Configuración' },
+        { label: 'Auditoría' },
+      ]
+    }
+  };
+
+  let activeFlyout = null;
+
+  function openFlyout(name, railEl) {
+    // toggle if same section clicked again
+    if (activeFlyout === name) { closeFlyout(); return; }
+    activeFlyout = name;
+
+    const data = flyoutData[name];
+    const flyout = document.getElementById('flyout');
+    const title  = document.getElementById('flyout-title');
+    const list   = document.getElementById('flyout-list');
+
+    title.innerHTML = data.icon + ' ' + data.title;
+
+    list.innerHTML = data.items.map(item => {
+      if (item.group) return `<div class="flyout-group-label">${item.group}</div>`;
+      const page = item.page ? `onclick="railNav(null,'${item.page}')"` : '';
+      return `<div class="flyout-item" ${page}>${item.label}</div>`;
+    }).join('');
+
+    // mark rail item active
+    document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
+    railEl.classList.add('active');
+
+    flyout.classList.add('open');
+  }
+
+  function closeFlyout() {
+    activeFlyout = null;
+    document.getElementById('flyout').classList.remove('open');
+  }
+
+  function railNav(page, el) {
+    closeFlyout();
+    if (el) {
+      document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
+      el.classList.add('active');
+    }
+    if (!page) return;
+    const target = document.getElementById('page-' + page);
+    if (target) {
+      document.querySelectorAll('.demo-page').forEach(p => {
+        p.classList.remove('active');
+        p.style.display = 'none';
+      });
+      target.classList.add('active');
+      target.style.display = target.dataset.display || 'flex';
+    }
+  }
+
+  function setNav(el, page) {
+    railNav(page, el);
+  }
+
+  /* ============================================================
+     ROLE SWITCHER
+  ============================================================ */
+  const ROLES = [
+    {
+      id: 'admin',
+      nombre: 'Administrador',
+      iniciales: 'AD',
+      color: '#F59E0B',
+      desc: 'Acceso total al sistema',
+      nav: ['dashboard','bitacoras','batch','planificador','ejecucion','reportes','admin','seguridad','mantenimiento'],
+      acciones: ['play','stop','edit','delete','create','config'],
+      banner: null
+    },
+    {
+      id: 'supervisor',
+      nombre: 'Supervisor',
+      iniciales: 'SV',
+      color: '#8B5CF6',
+      desc: 'Acceso total al sistema',
+      nav: ['dashboard','bitacoras','batch','planificador','ejecucion','reportes','admin','seguridad','mantenimiento'],
+      acciones: ['play','stop','edit','delete','create','config'],
+      banner: null
+    },
+    {
+      id: 'operador',
+      nombre: 'Operador',
+      iniciales: 'OP',
+      color: '#3B82F6',
+      desc: 'Dashboard, Bitácoras y Reportes',
+      nav: ['dashboard','bitacoras','reportes'],
+      acciones: ['play','stop'],
+      banner: 'Estás viendo como Operador — acceso limitado a Dashboard, Bitácoras y Reportes.'
+    },
+    {
+      id: 'auditor',
+      nombre: 'Auditor',
+      iniciales: 'AU',
+      color: '#10B981',
+      desc: 'Solo reportes y logs',
+      nav: ['dashboard','reportes'],
+      acciones: [],
+      banner: 'Estás viendo como Auditor — acceso restringido a Dashboard y Reportes.'
+    },
+  ];
+
+  let currentRole = ROLES[0];
+
+  function buildRoleDropdown() {
+    const dropdown = document.getElementById('roleDropdown');
+    const header = dropdown.querySelector('.role-dropdown-header');
+    dropdown.innerHTML = '';
+    dropdown.appendChild(header);
+    ROLES.forEach(role => {
+      const item = document.createElement('div');
+      item.className = 'role-item' + (role.id === currentRole.id ? ' active' : '');
+      item.innerHTML = `
+        <div class="role-avatar" style="background:${role.color}20;color:${role.color}">${role.iniciales}</div>
+        <div class="role-info">
+          <div class="role-name">${role.nombre}</div>
+          <div class="role-desc">${role.desc}</div>
+        </div>
+        ${role.id === currentRole.id ? '<span class="role-check">✓</span>' : ''}
+      `;
+      item.onclick = (e) => { e.stopPropagation(); applyRole(role); };
+      dropdown.appendChild(item);
+    });
+  }
+
+  function toggleRoleDropdown(e) {
+    if (e) e.stopPropagation();
+    buildRoleDropdown();
+    const dd = document.getElementById('roleDropdown');
+    const btn = document.getElementById('roleToggle');
+    const isOpen = dd.classList.contains('open');
+    if (!isOpen) {
+      const rect = btn.getBoundingClientRect();
+      dd.style.top = (rect.bottom + 8) + 'px';
+      dd.style.right = (window.innerWidth - rect.right) + 'px';
+    }
+    dd.classList.toggle('open');
+    if (dd.classList.contains('open')) {
+      setTimeout(() => document.addEventListener('click', closeRoleDropdown, { once: true }), 50);
+    }
+  }
+
+  function closeRoleDropdown() {
+    document.getElementById('roleDropdown')?.classList.remove('open');
+  }
+
+  function applyRole(role) {
+    currentRole = role;
+    closeRoleDropdown();
+
+    // Header
+    document.getElementById('headerAvatar').textContent = role.iniciales;
+    document.getElementById('headerAvatar').style.background = role.color;
+    document.getElementById('headerRoleName').textContent = role.nombre;
+
+    // Banner
+    const banner = document.getElementById('roleBanner');
+    const bannerText = document.getElementById('roleBannerText');
+    if (role.banner) {
+      banner.classList.add('visible');
+      bannerText.innerHTML = role.banner;
+    } else {
+      banner.classList.remove('visible');
+    }
+
+    // Sidebar nav — mostrar/ocultar por data-nav
+    document.querySelectorAll('.nav-item[data-nav]').forEach(el => {
+      const key = el.dataset.nav;
+      el.style.display = role.nav.includes(key) ? '' : 'none';
+    });
+
+    // Acciones — botones play/stop en cards
+    document.querySelectorAll('.btn-icon[title="Ejecutar"], .btn-icon[title="Detener"]').forEach(btn => {
+      btn.style.opacity = role.acciones.includes('play') ? '' : '.3';
+      btn.style.pointerEvents = role.acciones.includes('play') ? '' : 'none';
+    });
+
+    // Botón + Nueva Bitácora
+    const newBtn = document.querySelector('.btn-primary');
+    if (newBtn) {
+      newBtn.style.display = role.acciones.includes('create') ? '' : 'none';
+    }
+  }
+
+  // Inicializar dropdown al cargar
+  buildRoleDropdown();
+
+  /* ============================================================
+     BITÁCORAS — BULK SELECTION
+  ============================================================ */
+  let bitSelection = new Set();
+
+  function toggleBitSelect(id, cardEl) {
+    if (bitSelection.has(id)) {
+      bitSelection.delete(id);
+      cardEl.classList.remove('selected');
+    } else {
+      bitSelection.add(id);
+      cardEl.classList.add('selected');
+    }
+    updateBulkBar();
+  }
+
+  function bitCardClick(id, cardEl) {
+    // Si hay selección activa, el click en la card también selecciona
+    if (bitSelection.size > 0) {
+      toggleBitSelect(id, cardEl);
+    } else {
+      // Sin selección: abre drill-down (solo para los que tienen datos)
+      if (id <= 2) openDp(id);
+    }
+  }
+
+  function updateBulkBar() {
+    const bar   = document.getElementById('bitBulkBar');
+    const count = document.getElementById('bitBulkCount');
+    const n = bitSelection.size;
+    if (n > 0) {
+      bar.classList.add('visible');
+      count.textContent = n === 1 ? '1 seleccionada' : `${n} seleccionadas`;
+    } else {
+      bar.classList.remove('visible');
+    }
+    // Actualizar btn "Seleccionar todo"
+    const allCards = document.querySelectorAll('#page-bitacoras .bita-card');
+    const btn = document.getElementById('bitSelectAllBtn');
+    if (btn) {
+      const allSelected = n === allCards.length;
+      btn.textContent = allSelected ? '☑ Deseleccionar todo' : '☐ Seleccionar todo';
+      btn.classList.toggle('active', allSelected);
+    }
+  }
+
+  function clearBitSelection() {
+    bitSelection.clear();
+    document.querySelectorAll('#page-bitacoras .bita-card.selected')
+      .forEach(c => c.classList.remove('selected'));
+    updateBulkBar();
+  }
+
+  function toggleSelectAllBit(btn) {
+    const allCards = document.querySelectorAll('#page-bitacoras .bita-card[data-bit-id]');
+    if (bitSelection.size === allCards.length) {
+      clearBitSelection();
+    } else {
+      allCards.forEach(c => {
+        const id = parseInt(c.dataset.bitId);
+        bitSelection.add(id);
+        c.classList.add('selected');
+      });
+      updateBulkBar();
+    }
+  }
+
+  function bulkBit(accion) {
+    const ids = [...bitSelection];
+    const labels = { ejecutar:'Ejecutar', detener:'Detener', reintentar:'Reintentar', cancelar:'Cancelar' };
+    // Feedback visual (simulado)
+    const bar = document.getElementById('bitBulkBar');
+    const orig = document.getElementById('bitBulkCount').textContent;
+    document.getElementById('bitBulkCount').textContent =
+      `${labels[accion]} ${ids.length} bitácora${ids.length > 1 ? 's' : ''}…`;
+    bar.style.background = accion === 'cancelar' ? '#7F1D1D' : '#1e3a5f';
+    setTimeout(() => {
+      bar.style.background = '';
+      document.getElementById('bitBulkCount').textContent = orig;
+      if (accion === 'cancelar') clearBitSelection();
+    }, 1500);
+  }
+
+  /* ============================================================
+     DRILL-DOWN PANEL — Bitácoras
+  ============================================================ */
+  const dpBitacoras = [
+    {
+      id: 1, nombre: 'TEST FEDE 20260326', ambiente: 'SRV PRUEBAS N',
+      inicio: '26/3/2026 12:42', fin: '30/3/2026 16:55', estado: 'error',
+      total: 24, ok: 1, error: 1, pendiente: 1,
+      instancias: [
+        {
+          id: 'Inst-1', nombre: 'Inst-1', total: 9, ok: 6, error: 2, pendiente: 1,
+          cmds: [
+            { id: 100102, nombre: 'COMANDO 100102 PRUEBA', estado: 'error', lote: '1 - PRUEBAFB',
+              inicio: '30/3/2026 16:40:05', fin: '30/3/2026 16:40:12', duracion: '7s', progreso: 100,
+              retCode: -1, log: '[30/3/2026 16:40:05] INFO  Iniciando comando 100102...\n[30/3/2026 16:40:07] ERROR Al ejecutar: COMANDO 100102 PRUEBA\n[30/3/2026 16:40:12] ERROR Return code: -1 — proceso finalizado con error' },
+            { id: 100103, nombre: 'SFBC80', estado: 'ok', lote: '1 - PRUEBAFB',
+              inicio: '26/3/2026 16:15:40', fin: '26/3/2026 16:16:16', duracion: '36s', progreso: 100,
+              retCode: 0, log: '[26/3/2026 16:15:40] INFO  Iniciando SFBC80...\n[26/3/2026 16:15:55] INFO  Procesando registros...\n[26/3/2026 16:16:16] OK    Comando completado. Return code: 0' },
+            { id: 100104, nombre: 'SCBC05', estado: 'running', lote: '1 - PRUEBAFB',
+              inicio: '26/3/2026 16:15:40', fin: '', duracion: '1m 05s', progreso: 36,
+              retCode: null, log: '[26/3/2026 16:15:40] INFO  Iniciando SCBC05...\n[26/3/2026 16:16:10] INFO  En ejecución... (36%)' },
+          ]
+        },
+        {
+          id: 'Inst-2', nombre: 'Inst-2', total: 3, ok: 3, error: 0, pendiente: 0,
+          cmds: [
+            { id: 200101, nombre: 'LECTURA_SQL3', estado: 'ok', lote: '2 - PRUEBAFB',
+              inicio: '30/3/2026 14:00', fin: '30/3/2026 14:02', duracion: '2m', progreso: 100,
+              retCode: 0, log: '[30/3/2026 14:00:00] INFO  Iniciando LECTURA_SQL3...\n[30/3/2026 14:01:30] INFO  Registros leídos: 4,821\n[30/3/2026 14:02:00] OK    Completado. Return code: 0' },
+            { id: 200102, nombre: 'PROCESO_BATCH', estado: 'ok', lote: '2 - PRUEBAFB',
+              inicio: '30/3/2026 14:03', fin: '30/3/2026 14:05', duracion: '2m', progreso: 100,
+              retCode: 0, log: '[30/3/2026 14:03:00] INFO  Iniciando PROCESO_BATCH...\n[30/3/2026 14:04:45] INFO  Procesando...\n[30/3/2026 14:05:00] OK    Completado. Return code: 0' },
+          ]
+        },
+        {
+          id: 'Inst-3', nombre: 'Inst-3', total: 5, ok: 5, error: 0, pendiente: 0,
+          cmds: [
+            { id: 300101, nombre: 'CIERRE_PARCIAL', estado: 'ok', lote: '3 - PRUEBAFB',
+              inicio: '30/3/2026 15:00', fin: '30/3/2026 15:03', duracion: '3m', progreso: 100,
+              retCode: 0, log: '[30/3/2026 15:00:00] INFO  Iniciando CIERRE_PARCIAL...\n[30/3/2026 15:03:00] OK    Completado.' },
+          ]
+        }
+      ]
+    },
+    {
+      id: 2, nombre: 'EJECUTAR COMANDO NORMAL', ambiente: 'SRV PRUEBAS N',
+      inicio: '26/3/2026 11:59', fin: '26/3/2026 16:19', estado: 'ok',
+      total: 5, ok: 3, error: 0, pendiente: 0,
+      instancias: [
+        {
+          id: 'Inst-1', nombre: 'Inst-1', total: 3, ok: 3, error: 0, pendiente: 0,
+          cmds: [
+            { id: 400101, nombre: 'SFBC80', estado: 'ok', lote: '1 - NORMAL',
+              inicio: '26/3/2026 11:59', fin: '26/3/2026 12:01', duracion: '2m', progreso: 100,
+              retCode: 0, log: '[26/3/2026 11:59:00] INFO  Iniciando SFBC80...\n[26/3/2026 12:01:00] OK    Completado. Return code: 0' },
+            { id: 400102, nombre: 'SCBC05', estado: 'ok', lote: '1 - NORMAL',
+              inicio: '26/3/2026 12:01', fin: '26/3/2026 12:04', duracion: '3m', progreso: 100,
+              retCode: 0, log: '[26/3/2026 12:01:00] INFO  Iniciando SCBC05...\n[26/3/2026 12:04:00] OK    Completado. Return code: 0' },
+          ]
+        }
+      ]
+    }
+  ];
+
+  let dpStack = [];
+
+  const STATUS_COLOR = { ok:'#16A34A', error:'#DC2626', running:'#0369A1', warning:'#D97706', pending:'#7C3AED' };
+  const STATUS_BADGE = { ok:'badge-success', error:'badge-error', running:'badge-running', warning:'badge-warning' };
+  const STATUS_LABEL = { ok:'Completado', error:'Con Errores', running:'En Ejecución', warning:'Advertencias', pending:'Pendiente' };
+
+  function openDp(bitId) {
+    const bit = dpBitacoras.find(b => b.id === bitId);
+    if (!bit) return;
+    dpStack = [{ level: 'instancias', bitacora: bit }];
+    renderDp();
+    document.getElementById('dpOverlay').style.display = 'block';
+    setTimeout(() => document.getElementById('dpPanel').style.transform = 'translateX(0)', 10);
+  }
+
+  function closeDp() {
+    document.getElementById('dpPanel').style.transform = 'translateX(100%)';
+    setTimeout(() => { document.getElementById('dpOverlay').style.display = 'none'; dpStack = []; }, 260);
+  }
+
+  function dpGoBack() {
+    dpStack.pop();
+    if (dpStack.length === 0) { closeDp(); return; }
+    renderDp();
+  }
+
+  function dpGoTo(index) {
+    dpStack = dpStack.slice(0, index + 1);
+    renderDp();
+  }
+
+  function dpOpenInstancia(instId) {
+    const bit = dpStack[0].bitacora;
+    const inst = bit.instancias.find(i => i.id === instId);
+    if (!inst) return;
+    dpStack.push({ level: 'comandos', bitacora: bit, instancia: inst });
+    renderDp();
+  }
+
+  function dpOpenComando(cmdId) {
+    const frame = dpStack[dpStack.length - 1];
+    const cmd = frame.instancia.cmds.find(c => c.id === cmdId);
+    if (!cmd) return;
+    dpStack.push({ level: 'detalle', bitacora: frame.bitacora, instancia: frame.instancia, cmd });
+    renderDp();
+  }
+
+  function renderDp() {
+    const frame = dpStack[dpStack.length - 1];
+
+    // ── Breadcrumb ──
+    const crumbs = dpStack.map((s, i) => {
+      const isLast = i === dpStack.length - 1;
+      const label = i === 0 ? s.bitacora.nombre
+                  : s.level === 'comandos' ? s.instancia.nombre
+                  : s.cmd.nombre;
+      if (isLast) return `<span class="dp-crumb-current">${label}</span>`;
+      return `<span class="dp-crumb-item" onclick="dpGoTo(${i})">${label}</span><span class="dp-crumb-sep">›</span>`;
+    });
+    // Add back button if not root
+    const backBtn = dpStack.length > 1
+      ? `<button onclick="dpGoBack()" style="border:none;background:none;cursor:pointer;font-size:16px;color:var(--text-muted);padding:0 6px 0 0;line-height:1">←</button>`
+      : '';
+    document.getElementById('dpBreadcrumb').innerHTML = backBtn + `<div class="dp-crumb">${crumbs.join('')}</div>`;
+
+    // ── Content ──
+    let html = '';
+    const bit = frame.bitacora;
+
+    if (frame.level === 'instancias') {
+      const statusColor = STATUS_COLOR[bit.estado] || '#64748B';
+      html = `
+        <div class="dp-header">
+          <div class="dp-header-top">
+            <div>
+              <div class="dp-title">${bit.nombre}</div>
+              <div class="dp-sub">${bit.ambiente} · ${bit.inicio} → ${bit.fin || 'En ejecución'}</div>
+            </div>
+            <button class="dp-close-btn" onclick="closeDp()">✕</button>
+          </div>
+          <span class="badge ${STATUS_BADGE[bit.estado] || 'badge-blocked'}">${STATUS_LABEL[bit.estado] || bit.estado}</span>
+        </div>
+        <div class="dp-stats-row">
+          <div class="dp-stat"><div class="dp-stat-val">${bit.total}</div><div class="dp-stat-lbl">Total</div></div>
+          <div class="dp-stat"><div class="dp-stat-val" style="color:#16A34A">${bit.ok}</div><div class="dp-stat-lbl">OK</div></div>
+          <div class="dp-stat"><div class="dp-stat-val" style="color:#DC2626">${bit.error}</div><div class="dp-stat-lbl">Error</div></div>
+          <div class="dp-stat"><div class="dp-stat-val" style="color:#7C3AED">${bit.pendiente}</div><div class="dp-stat-lbl">Pend.</div></div>
+          <div class="dp-stat"><div class="dp-stat-val">${bit.instancias.length}</div><div class="dp-stat-lbl">Instancias</div></div>
+        </div>
+        <div style="padding:8px 16px;font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em;border-bottom:1px solid var(--border-subtle)">
+          Instancias (${bit.instancias.length})
+        </div>
+        <div class="dp-list">
+          ${bit.instancias.map(inst => {
+            const dot = inst.error > 0 ? '#DC2626' : inst.pendiente > 0 ? '#0369A1' : '#16A34A';
+            return `
+              <div class="dp-list-item" onclick="dpOpenInstancia('${inst.id}')">
+                <div class="dp-item-dot" style="background:${dot}"></div>
+                <div class="dp-item-body">
+                  <div class="dp-item-name">${inst.nombre}</div>
+                  <div class="dp-item-meta">${inst.total} comandos · ${inst.ok} OK · ${inst.error} error · ${inst.pendiente} pend.</div>
+                </div>
+                <div class="dp-item-right">
+                  ${inst.error > 0 ? `<span class="badge badge-error">${inst.error} error</span>` : `<span class="badge badge-success">${inst.ok} OK</span>`}
+                  <span class="dp-item-arrow">›</span>
+                </div>
+              </div>`;
+          }).join('')}
+        </div>`;
+    }
+
+    else if (frame.level === 'comandos') {
+      const inst = frame.instancia;
+      html = `
+        <div class="dp-header">
+          <div class="dp-header-top">
+            <div>
+              <div class="dp-title">${inst.nombre}</div>
+              <div class="dp-sub">${bit.nombre}</div>
+            </div>
+            <button class="dp-close-btn" onclick="closeDp()">✕</button>
+          </div>
+        </div>
+        <div class="dp-stats-row">
+          <div class="dp-stat"><div class="dp-stat-val">${inst.total}</div><div class="dp-stat-lbl">Total</div></div>
+          <div class="dp-stat"><div class="dp-stat-val" style="color:#16A34A">${inst.ok}</div><div class="dp-stat-lbl">OK</div></div>
+          <div class="dp-stat"><div class="dp-stat-val" style="color:#DC2626">${inst.error}</div><div class="dp-stat-lbl">Error</div></div>
+          <div class="dp-stat"><div class="dp-stat-val" style="color:#7C3AED">${inst.pendiente}</div><div class="dp-stat-lbl">Pend.</div></div>
+        </div>
+        <div style="padding:8px 16px;font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em;border-bottom:1px solid var(--border-subtle)">
+          Comandos (${inst.cmds.length})
+        </div>
+        <div class="dp-list">
+          ${inst.cmds.map(cmd => {
+            const dot = STATUS_COLOR[cmd.estado] || '#64748B';
+            const prog = cmd.estado === 'running'
+              ? `<div class="bita-progress" style="margin-top:4px"><div class="bita-progress-bar" style="width:${cmd.progreso}%"></div></div>` : '';
+            return `
+              <div class="dp-list-item" onclick="dpOpenComando(${cmd.id})">
+                <div class="dp-item-dot" style="background:${dot}${cmd.estado==='running'?';animation:pulse 1.4s infinite':''}"></div>
+                <div class="dp-item-body">
+                  <div class="dp-item-name">${cmd.id} — ${cmd.nombre}</div>
+                  <div class="dp-item-meta">Lote: ${cmd.lote} · ${cmd.inicio} · ${cmd.duracion}</div>
+                  ${prog}
+                </div>
+                <div class="dp-item-right">
+                  <span class="badge ${STATUS_BADGE[cmd.estado] || 'badge-blocked'}" style="font-size:10px">${STATUS_LABEL[cmd.estado]||cmd.estado}</span>
+                  <span class="dp-item-arrow">›</span>
+                </div>
+              </div>`;
+          }).join('')}
+        </div>`;
+    }
+
+    else if (frame.level === 'detalle') {
+      const c = frame.cmd;
+      const logClass = c.estado === 'error' ? 'dp-log-error' : c.estado === 'running' ? 'dp-log-info' : 'dp-log-ok';
+      html = `
+        <div class="dp-header">
+          <div class="dp-header-top">
+            <div>
+              <div class="dp-title">${c.id} — ${c.nombre}</div>
+              <div class="dp-sub">${frame.instancia.nombre} · ${bit.nombre}</div>
+            </div>
+            <button class="dp-close-btn" onclick="closeDp()">✕</button>
+          </div>
+          <span class="badge ${STATUS_BADGE[c.estado] || 'badge-blocked'}">${STATUS_LABEL[c.estado]||c.estado}</span>
+        </div>
+        <div class="dp-detail-section">
+          <div class="dp-detail-section-title">Información del comando</div>
+          <div class="dp-detail-row"><span class="dp-detail-label">ID</span><span class="dp-detail-value">${c.id}</span></div>
+          <div class="dp-detail-row"><span class="dp-detail-label">Nombre</span><span class="dp-detail-value">${c.nombre}</span></div>
+          <div class="dp-detail-row"><span class="dp-detail-label">Lote</span><span class="dp-detail-value">${c.lote}</span></div>
+          <div class="dp-detail-row"><span class="dp-detail-label">Inicio</span><span class="dp-detail-value">${c.inicio}</span></div>
+          <div class="dp-detail-row"><span class="dp-detail-label">Fin</span><span class="dp-detail-value">${c.fin || '— En ejecución'}</span></div>
+          <div class="dp-detail-row"><span class="dp-detail-label">Duración</span><span class="dp-detail-value">${c.duracion}</span></div>
+          <div class="dp-detail-row"><span class="dp-detail-label">Return code</span><span class="dp-detail-value" style="color:${c.retCode === 0 ? '#16A34A' : c.retCode === null ? '#0369A1' : '#DC2626'};font-weight:700">${c.retCode !== null ? c.retCode : '—'}</span></div>
+        </div>
+        ${c.estado === 'running' ? `
+        <div class="dp-detail-section">
+          <div class="dp-detail-section-title">Progreso</div>
+          <div style="display:flex;align-items:center;gap:10px;">
+            <div class="bita-progress" style="flex:1"><div class="bita-progress-bar" style="width:${c.progreso}%"></div></div>
+            <span style="font-size:12px;font-weight:700;color:#0369A1">${c.progreso}%</span>
+          </div>
+        </div>` : ''}
+        <div class="dp-detail-section">
+          <div class="dp-detail-section-title">Log de ejecución</div>
+          <div class="dp-log-block"><span class="${logClass}">${c.log}</span></div>
+        </div>
+        <div class="dp-detail-section" style="display:flex;gap:8px;border-bottom:none">
+          <button class="btn btn-secondary btn-sm">↺ Reintentar</button>
+          <button class="btn btn-secondary btn-sm">⬇ Exportar log</button>
+        </div>`;
+    }
+
+    document.getElementById('dpContent').innerHTML = html;
+    document.getElementById('dpContent').scrollTop = 0;
+  }
+</script>
+
+
+</body>
+</html>

@@ -1,0 +1,36 @@
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+09/06/2026 15:00:01 — Iniciando robot
+
+══════════════════════════════════════════════════
+  🤖  AST Time Report Bot
+  📅  Fecha: 09/06/2026
+  ⏱   Horas a cargar: 8 hs
+══════════════════════════════════════════════════
+
+  →  Navegando a https://timereport.accusys.com.ar/web/login.aspx
+  ✓  Login OK
+  →  Screenshot guardado en: /Users/matiaslazarte/Cloude_1/logs/debug_post_login.png
+  →  Seleccionando actividad 121431...
+  ⚠  No se encontró la actividad 121431. Verificá manualmente.
+  →  Verificando fecha...
+  ⚠  No se encontró campo de fecha — continuando de todas formas
+  ⚠  No se pudo verificar la fecha. Asegurate de que sea 09/06/2026
+  →  Seleccionando horas...
+  ⚠  No se encontró el dropdown de horas. Configuralo manualmente.
+
+──────────────────────────────────────────────────
+  →  Modo automático: guardando en 3 segundos...
+  ⚠  No se encontró el botón Guardar. Hacelo manualmente.
+Presioná ENTER cuando hayas guardado...Traceback (most recent call last):
+  File "/Users/matiaslazarte/Cloude_1/timereport_bot.py", line 371, in <module>
+    main()
+  File "/Users/matiaslazarte/Cloude_1/timereport_bot.py", line 363, in main
+    asyncio.run(run(args.horas, auto, args.headless))
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/asyncio/runners.py", line 44, in run
+    return loop.run_until_complete(main)
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/asyncio/base_events.py", line 642, in run_until_complete
+    return future.result()
+  File "/Users/matiaslazarte/Cloude_1/timereport_bot.py", line 326, in run
+    input("Presioná ENTER cuando hayas guardado...")
+EOFError: EOF when reading a line
+15:00:21 — ❌ ERROR (código 1)

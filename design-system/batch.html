@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+
+<html class="light" lang="es"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>ProBatch - Batch Management</title>
+<!-- Fonts -->
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=Manrope:wght@500;700;800&amp;display=swap" rel="stylesheet"/>
+<!-- Icons -->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<!-- Tailwind -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "on-tertiary-fixed": "#321200",
+                    "on-tertiary": "#ffffff",
+                    "tertiary-fixed": "#ffdbc9",
+                    "tertiary-container": "#bc5700",
+                    "surface-container-highest": "#e0e3e5",
+                    "surface-bright": "#f7f9fb",
+                    "surface-container-high": "#e6e8ea",
+                    "surface-container": "#eceef0",
+                    "surface-variant": "#e0e3e5",
+                    "secondary": "#3f5f8d",
+                    "outline-variant": "#c0c7d6",
+                    "on-surface-variant": "#404754",
+                    "inverse-surface": "#2d3133",
+                    "primary-container": "#0075d7",
+                    "secondary-fixed": "#d5e3ff",
+                    "tertiary-fixed-dim": "#ffb68c",
+                    "on-primary-container": "#fefcff",
+                    "on-background": "#191c1e",
+                    "error-container": "#ffdad6",
+                    "on-secondary": "#ffffff",
+                    "on-tertiary-container": "#fffbff",
+                    "on-primary-fixed": "#001c3b",
+                    "on-secondary-container": "#345582",
+                    "on-error": "#ffffff",
+                    "surface-container-low": "#f2f4f6",
+                    "surface": "#f7f9fb",
+                    "on-primary-fixed-variant": "#004786",
+                    "on-secondary-fixed-variant": "#254874",
+                    "secondary-fixed-dim": "#a8c8fc",
+                    "on-secondary-fixed": "#001c3b",
+                    "on-primary": "#ffffff",
+                    "outline": "#707785",
+                    "inverse-on-surface": "#eff1f3",
+                    "on-tertiary-fixed-variant": "#753400",
+                    "surface-container-lowest": "#ffffff",
+                    "on-error-container": "#93000a",
+                    "error": "#ba1a1a",
+                    "primary-fixed-dim": "#a6c8ff",
+                    "surface-tint": "#005fb0",
+                    "secondary-container": "#abcbff",
+                    "inverse-primary": "#a6c8ff",
+                    "primary": "#005cab",
+                    "surface-dim": "#d8dadc",
+                    "on-surface": "#191c1e",
+                    "background": "#f7f9fb",
+                    "tertiary": "#964400",
+                    "primary-fixed": "#d5e3ff",
+                    "nav-dark": "#1e293b",
+                    "nav-accent": "#3b82f6"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.25rem",
+                    "lg": "0.5rem",
+                    "xl": "0.75rem",
+                    "full": "9999px"
+            },
+            "fontFamily": {
+                    "headline": ["Manrope"],
+                    "body": ["Inter"],
+                    "label": ["Inter"]
+            }
+          },
+        },
+      }
+    </script>
+<style>
+        body { font-family: 'Inter', sans-serif; }
+        h1, h2, h3, .brand-font { font-family: 'Manrope', sans-serif; }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .active-icon { font-variation-settings: 'FILL' 1; }
+        .glass-header {
+            background: rgba(255, 255, 255, 0.95);
+        }
+    </style>
+</head>
+<body class="bg-surface text-on-surface flex min-h-screen">
+<!-- Primary Dark Sidebar -->
+<aside class="flex flex-col h-screen w-20 bg-nav-dark fixed left-0 top-0 z-[60] py-4 items-center">
+<div class="mb-8">
+<div class="w-10 h-10 bg-nav-accent rounded-lg flex items-center justify-center text-white">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">dataset</span>
+</div>
+</div>
+<nav class="flex-1 w-full space-y-4">
+<a class="flex flex-col items-center gap-1 w-full py-2 text-slate-400 hover:text-white transition-colors" href="#">
+<span class="material-symbols-outlined text-[24px]">dashboard</span>
+<span class="text-[10px] font-medium">Inicio</span>
+</a>
+<a class="flex flex-col items-center gap-1 w-full py-2 text-slate-400 hover:text-white transition-colors relative" href="#">
+<span class="material-symbols-outlined text-[24px]">event_note</span>
+<span class="text-[10px] font-medium">Bitácoras</span>
+<span class="absolute top-1 right-4 bg-red-500 text-white text-[9px] font-bold w-4 h-4 rounded-full flex items-center justify-center border-2 border-nav-dark">3</span>
+</a>
+<a class="flex flex-col items-center gap-1 w-full py-2 text-white bg-nav-accent/20 border-r-4 border-nav-accent" href="#">
+<span class="material-symbols-outlined text-[24px]" style="font-variation-settings: 'FILL' 1;">layers</span>
+<span class="text-[10px] font-bold">Batch</span>
+</a>
+<a class="flex flex-col items-center gap-1 w-full py-2 text-slate-400 hover:text-white transition-colors" href="#">
+<span class="material-symbols-outlined text-[24px]">calendar_today</span>
+<span class="text-[10px] font-medium">Planif.</span>
+</a>
+<a class="flex flex-col items-center gap-1 w-full py-2 text-slate-400 hover:text-white transition-colors" href="#">
+<span class="material-symbols-outlined text-[24px]">play_circle</span>
+<span class="text-[10px] font-medium">Ejecución</span>
+</a>
+<a class="flex flex-col items-center gap-1 w-full py-2 text-slate-400 hover:text-white transition-colors" href="#">
+<span class="material-symbols-outlined text-[24px]">assessment</span>
+<span class="text-[10px] font-medium">Reportes</span>
+</a>
+</nav>
+<div class="mt-auto space-y-4 w-full">
+<a class="flex flex-col items-center gap-1 w-full py-2 text-slate-400 hover:text-white transition-colors" href="#">
+<span class="material-symbols-outlined text-[24px]">settings</span>
+<span class="text-[10px] font-medium">Admin.</span>
+</a>
+<a class="flex flex-col items-center gap-1 w-full py-2 text-slate-400 hover:text-white transition-colors" href="#">
+<span class="material-symbols-outlined text-[24px]">security</span>
+<span class="text-[10px] font-medium">Seguridad</span>
+</a>
+</div>
+</aside>
+<!-- Secondary Sidebar (Batch Menu) -->
+<aside class="flex flex-col h-screen w-52 border-r border-slate-200 bg-slate-50 fixed left-20 top-0 z-50 py-6 px-4">
+<div class="flex items-center justify-between mb-8 px-2">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-nav-accent text-[20px]" style="font-variation-settings: 'FILL' 1;">bolt</span>
+<h2 class="text-sm font-bold text-slate-800 uppercase tracking-tight">Batch</h2>
+</div>
+<button class="text-slate-400 hover:text-slate-600">
+<span class="material-symbols-outlined text-[18px]">close</span>
+</button>
+</div>
+<nav class="flex-1 space-y-8 overflow-y-auto pr-1">
+<div>
+<h3 class="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-2 mb-3">Configuración de Batch</h3>
+<div class="space-y-1">
+<a class="block text-sm font-semibold text-nav-accent px-2 py-1.5 bg-blue-50 rounded-md" href="#">Lotes</a>
+<a class="block text-sm font-medium text-slate-600 hover:text-slate-900 px-2 py-1.5 hover:bg-slate-100 rounded-md transition-colors" href="#">Dependencias</a>
+<a class="block text-sm font-medium text-slate-600 hover:text-slate-900 px-2 py-1.5 hover:bg-slate-100 rounded-md transition-colors" href="#">Plantillas</a>
+<a class="block text-sm font-medium text-slate-600 hover:text-slate-900 px-2 py-1.5 hover:bg-slate-100 rounded-md transition-colors" href="#">Planificación</a>
+</div>
+</div>
+<div>
+<h3 class="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-2 mb-3">Operaciones</h3>
+<div class="space-y-1">
+<a class="block text-sm font-medium text-slate-600 hover:text-slate-900 px-2 py-1.5 hover:bg-slate-100 rounded-md transition-colors" href="#">Clonar Bitácora</a>
+<a class="block text-sm font-medium text-slate-600 hover:text-slate-900 px-2 py-1.5 hover:bg-slate-100 rounded-md transition-colors" href="#">Claves Automáticas</a>
+<a class="block text-sm font-medium text-slate-600 hover:text-slate-900 px-2 py-1.5 hover:bg-slate-100 rounded-md transition-colors" href="#">Liberar Operador</a>
+<a class="block text-sm font-medium text-slate-600 hover:text-slate-900 px-2 py-1.5 hover:bg-slate-100 rounded-md transition-colors" href="#">Importar/Exportar</a>
+<a class="block text-sm font-medium text-slate-600 hover:text-slate-900 px-2 py-1.5 hover:bg-slate-100 rounded-md transition-colors" href="#">Gantt</a>
+</div>
+</div>
+</nav>
+</aside>
+<!-- Main Content -->
+<main class="flex-1 ml-[288px] bg-surface min-h-screen">
+<header class="flex items-center justify-between w-full px-8 h-16 sticky top-0 z-40 bg-white border-b border-slate-200/60">
+<div class="w-10"></div>
+<div class="flex-1 max-w-2xl px-8">
+<div class="relative group">
+<span class="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-[20px] transition-colors group-focus-within:text-primary">search</span>
+<input class="w-full bg-slate-50 border border-slate-100 rounded-full py-2.5 pl-11 pr-4 text-sm font-medium placeholder:text-slate-400 focus:bg-white focus:border-slate-200 focus:ring-0 transition-all outline-none" placeholder="Search batch processes, templates, or logs..." type="text"/>
+</div>
+</div>
+<div class="flex items-center gap-6">
+<div class="flex items-center gap-2">
+<button class="p-2 text-slate-500 hover:bg-slate-100 rounded-full transition-all relative group">
+<span class="material-symbols-outlined text-[22px]">notifications</span>
+<span class="absolute top-2 right-2.5 w-2 h-2 bg-error rounded-full border-2 border-white"></span>
+</button>
+<button class="p-2 text-slate-500 hover:bg-slate-100 rounded-full transition-all group">
+<span class="material-symbols-outlined text-[22px]">help</span>
+</button>
+</div>
+<div class="h-8 w-[1px] bg-slate-100"></div>
+<div class="flex items-center gap-3">
+<div class="text-right hidden lg:block">
+<p class="text-xs font-bold text-slate-800 leading-tight">Alex Rivera</p>
+<p class="text-[10px] text-slate-500 font-semibold tracking-wide uppercase">Ops Manager</p>
+</div>
+<div class="relative">
+<div class="w-9 h-9 rounded-full bg-nav-accent flex items-center justify-center text-white text-sm font-bold border border-slate-200">AR</div>
+<div class="absolute bottom-0 right-0 w-2.5 h-2.5 bg-green-500 border-2 border-white rounded-full"></div>
+</div>
+</div>
+</div>
+</header>
+<div class="p-8">
+<div class="flex justify-between items-end mb-8">
+<div>
+<div class="flex items-center gap-2 text-xs font-medium text-slate-400 mb-2">
+<span>Batch</span>
+<span class="material-symbols-outlined text-[14px]">chevron_right</span>
+<span class="text-blue-600">Lotes</span>
+</div>
+<h2 class="text-3xl font-extrabold tracking-tight text-on-surface">Gestión de Lotes</h2>
+<p class="text-on-surface-variant mt-1 text-sm">Supervisión y control de procesos de automatización en tiempo real.</p>
+</div>
+<button class="bg-gradient-to-r from-primary to-primary-container text-white px-6 py-2.5 rounded-full text-sm font-semibold flex items-center gap-2 hover:shadow-lg transition-all active:scale-95">
+<span class="material-symbols-outlined text-[20px]">add</span>
+NUEVO LOTE
+</button>
+</div>
+<div class="bg-surface-container-lowest rounded-xl border border-slate-200/50 overflow-hidden shadow-sm">
+<div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+<div class="flex items-center gap-4">
+<button class="flex items-center gap-2 text-xs font-bold text-slate-500 bg-surface-container-low px-3 py-1.5 rounded-lg hover:bg-slate-200 transition-colors">
+<span class="material-symbols-outlined text-[16px]">filter_list</span>
+FILTROS
+</button>
+<div class="flex items-center gap-1">
+<span class="w-2 h-2 rounded-full bg-secondary"></span>
+<span class="text-xs font-semibold text-slate-500 uppercase tracking-tight">84 Lotes Activos</span>
+</div>
+</div>
+<div class="flex gap-2">
+<button class="p-1.5 text-slate-400 hover:text-primary transition-colors">
+<span class="material-symbols-outlined text-[20px]">download</span>
+</button>
+<button class="p-1.5 text-slate-400 hover:text-primary transition-colors">
+<span class="material-symbols-outlined text-[20px]">more_vert</span>
+</button>
+</div>
+</div>
+<div class="overflow-x-auto">
+<table class="w-full text-left border-collapse">
+<thead>
+<tr class="bg-surface-container-low/50">
+<th class="px-6 py-4 text-[11px] font-bold text-slate-400 uppercase tracking-widest">ID Lote</th>
+<th class="px-6 py-4 text-[11px] font-bold text-slate-400 uppercase tracking-widest">Descripción</th>
+<th class="px-6 py-4 text-[11px] font-bold text-slate-400 uppercase tracking-widest">Estado</th>
+<th class="px-6 py-4 text-[11px] font-bold text-slate-400 uppercase tracking-widest">Progreso</th>
+<th class="px-6 py-4 text-[11px] font-bold text-slate-400 uppercase tracking-widest">Última Ejecución</th>
+<th class="px-6 py-4 text-[11px] font-bold text-slate-400 uppercase tracking-widest text-right">Acciones</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-slate-100">
+<tr class="hover:bg-slate-50/50 transition-colors group">
+<td class="px-6 py-4"><span class="text-sm font-bold text-blue-700 bg-blue-50 px-2 py-1 rounded">BTCH-2024-001</span></td>
+<td class="px-6 py-4">
+<p class="text-sm font-semibold text-on-surface">Procesamiento de Nómina Quincenal</p>
+<p class="text-[11px] text-on-surface-variant">Región LATAM • Finanzas</p>
+</td>
+<td class="px-6 py-4">
+<span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-secondary-container text-on-secondary-container text-[11px] font-bold uppercase">
+<span class="w-1.5 h-1.5 rounded-full bg-secondary animate-pulse"></span>EN EJECUCIÓN
+</span>
+</td>
+<td class="px-6 py-4">
+<div class="w-full max-w-[120px]">
+<div class="flex justify-between items-center mb-1"><span class="text-[10px] font-bold text-on-surface-variant">75%</span></div>
+<div class="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden"><div class="bg-primary h-full rounded-full" style="width: 75%"></div></div>
+</div>
+</td>
+<td class="px-6 py-4">
+<p class="text-sm text-on-surface">Hace 12 min</p>
+<p class="text-[11px] text-on-surface-variant">Oct 24, 09:12 AM</p>
+</td>
+<td class="px-6 py-4 text-right">
+<button class="p-2 text-slate-400 hover:text-primary transition-all opacity-0 group-hover:opacity-100"><span class="material-symbols-outlined text-[18px]">visibility</span></button>
+<button class="p-2 text-slate-400 hover:text-primary transition-all"><span class="material-symbols-outlined text-[18px]">play_arrow</span></button>
+</td>
+</tr>
+<tr class="hover:bg-slate-50/50 transition-colors group">
+<td class="px-6 py-4"><span class="text-sm font-bold text-slate-600 bg-slate-100 px-2 py-1 rounded">BTCH-2024-002</span></td>
+<td class="px-6 py-4">
+<p class="text-sm font-semibold text-on-surface">Sincronización Inventario ERP</p>
+<p class="text-[11px] text-on-surface-variant">Global Logistics • Almacén</p>
+</td>
+<td class="px-6 py-4">
+<span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-tertiary-fixed text-on-tertiary-fixed-variant text-[11px] font-bold uppercase">
+<span class="material-symbols-outlined text-[14px]">pause</span>PAUSADO
+</span>
+</td>
+<td class="px-6 py-4">
+<div class="w-full max-w-[120px]">
+<div class="flex justify-between items-center mb-1"><span class="text-[10px] font-bold text-on-surface-variant">40%</span></div>
+<div class="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden"><div class="bg-tertiary h-full rounded-full" style="width: 40%"></div></div>
+</div>
+</td>
+<td class="px-6 py-4">
+<p class="text-sm text-on-surface">Ayer</p>
+<p class="text-[11px] text-on-surface-variant">Oct 23, 11:45 PM</p>
+</td>
+<td class="px-6 py-4 text-right">
+<button class="p-2 text-slate-400 hover:text-primary transition-all opacity-0 group-hover:opacity-100"><span class="material-symbols-outlined text-[18px]">visibility</span></button>
+<button class="p-2 text-slate-400 hover:text-primary transition-all"><span class="material-symbols-outlined text-[18px]">play_arrow</span></button>
+</td>
+</tr>
+<tr class="hover:bg-slate-50/50 transition-colors group">
+<td class="px-6 py-4"><span class="text-sm font-bold text-green-700 bg-green-50 px-2 py-1 rounded">BTCH-2024-003</span></td>
+<td class="px-6 py-4">
+<p class="text-sm font-semibold text-on-surface">Backup de Base de Datos Diaria</p>
+<p class="text-[11px] text-on-surface-variant">Infraestructura IT • Sistemas</p>
+</td>
+<td class="px-6 py-4">
+<span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-green-100 text-green-700 text-[11px] font-bold uppercase">
+<span class="material-symbols-outlined text-[14px]">check_circle</span>COMPLETADO
+</span>
+</td>
+<td class="px-6 py-4">
+<div class="w-full max-w-[120px]">
+<div class="flex justify-between items-center mb-1"><span class="text-[10px] font-bold text-on-surface-variant">100%</span></div>
+<div class="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden"><div class="bg-green-500 h-full rounded-full" style="width: 100%"></div></div>
+</div>
+</td>
+<td class="px-6 py-4">
+<p class="text-sm text-on-surface">Hace 2 horas</p>
+<p class="text-[11px] text-on-surface-variant">Oct 24, 07:00 AM</p>
+</td>
+<td class="px-6 py-4 text-right">
+<button class="p-2 text-slate-400 hover:text-primary transition-all opacity-0 group-hover:opacity-100"><span class="material-symbols-outlined text-[18px]">visibility</span></button>
+<button class="p-2 text-slate-400 hover:text-primary transition-all"><span class="material-symbols-outlined text-[18px]">refresh</span></button>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="px-6 py-4 border-t border-slate-100 flex items-center justify-between bg-surface-container-low/30">
+<p class="text-xs font-medium text-on-surface-variant">Mostrando <span class="text-on-surface">1 - 10</span> de 84 registros</p>
+<div class="flex items-center gap-2">
+<button class="p-1 text-slate-400 hover:text-primary disabled:opacity-50" disabled=""><span class="material-symbols-outlined">chevron_left</span></button>
+<div class="flex items-center">
+<button class="w-8 h-8 rounded-lg bg-primary text-white text-xs font-bold">1</button>
+<button class="w-8 h-8 rounded-lg text-xs font-semibold text-slate-500 hover:bg-slate-100">2</button>
+<button class="w-8 h-8 rounded-lg text-xs font-semibold text-slate-500 hover:bg-slate-100">3</button>
+<span class="px-1 text-slate-400">...</span>
+<button class="w-8 h-8 rounded-lg text-xs font-semibold text-slate-500 hover:bg-slate-100">9</button>
+</div>
+<button class="p-1 text-slate-400 hover:text-primary"><span class="material-symbols-outlined">chevron_right</span></button>
+</div>
+</div>
+</div>
+<div class="mt-8 grid grid-cols-1 md:grid-cols-3 gap-6">
+<div class="bg-surface-container-lowest p-6 rounded-xl border border-slate-200/50 shadow-sm flex flex-col justify-between">
+<div>
+<h3 class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4">Salud del Sistema</h3>
+<div class="flex items-end gap-3">
+<span class="text-4xl font-extrabold tracking-tight text-on-surface">98.4%</span>
+<span class="text-green-500 text-xs font-bold flex items-center gap-0.5 mb-1">
+<span class="material-symbols-outlined text-[14px]">arrow_upward</span>+0.2%
+</span>
+</div>
+</div>
+<div class="mt-6 flex gap-1 h-8 items-end">
+<div class="w-full bg-primary/20 rounded-t h-4 hover:h-8 transition-all"></div>
+<div class="w-full bg-primary/20 rounded-t h-6 hover:h-8 transition-all"></div>
+<div class="w-full bg-primary h-8 rounded-t"></div>
+<div class="w-full bg-primary/20 rounded-t h-5 hover:h-8 transition-all"></div>
+<div class="w-full bg-primary/20 rounded-t h-3 hover:h-8 transition-all"></div>
+<div class="w-full bg-primary/20 rounded-t h-7 hover:h-8 transition-all"></div>
+</div>
+</div>
+<div class="bg-surface-container-lowest p-6 rounded-xl border border-slate-200/50 shadow-sm col-span-1 md:col-span-2 relative overflow-hidden">
+<div class="absolute top-0 right-0 p-4 opacity-5">
+<span class="material-symbols-outlined text-[120px]" style="font-variation-settings: 'FILL' 1;">terminal</span>
+</div>
+<h3 class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4">Bitácora de Eventos Recientes</h3>
+<div class="space-y-3">
+<div class="flex items-center gap-3 text-xs">
+<span class="text-slate-400 font-mono">09:19:42</span>
+<span class="text-error font-bold">[ERROR]</span>
+<span class="text-on-surface font-medium truncate">BTCH-2024-004: Tiempo de espera agotado en servidor secundario.</span>
+</div>
+<div class="flex items-center gap-3 text-xs">
+<span class="text-slate-400 font-mono">09:12:15</span>
+<span class="text-blue-600 font-bold">[INFO]</span>
+<span class="text-on-surface font-medium truncate">BTCH-2024-001: Iniciando fase de cálculo de impuestos regionales.</span>
+</div>
+<div class="flex items-center gap-3 text-xs">
+<span class="text-slate-400 font-mono">08:55:00</span>
+<span class="text-green-600 font-bold">[SUCCESS]</span>
+<span class="text-on-surface font-medium truncate">Tarea 'CleanCache' finalizada con éxito en el cluster 4.</span>
+</div>
+</div>
+<button class="mt-6 text-xs font-bold text-primary flex items-center gap-1 hover:underline">
+VER BITÁCORA COMPLETA
+<span class="material-symbols-outlined text-[14px]">arrow_forward</span>
+</button>
+</div>
+</div>
+</div>
+</main>
+</body></html>
