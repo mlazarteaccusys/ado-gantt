@@ -253,6 +253,8 @@ function loadCfg() {
   if (cfg.org && cfg.project && cfg.pat) {
     document.getElementById('configOverlay').style.display = 'none';
     loadData();
+  } else {
+    showConfig();
   }
 }
 
