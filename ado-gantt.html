@@ -595,8 +595,9 @@ const TYPE_ORDER = { 'Epic': 0, 'Feature': 1, 'User Story': 2, 'Technical Task':
 // Progreso basado en estado del item
 function stateToProgress(state) {
   const s = (state || '').toLowerCase();
-  if (['done','closed','resolved','completed','inactive'].some(x => s.includes(x))) return 100;
-  if (['active','in progress','committed','in review','code review','in-progress'].some(x => s.includes(x))) return 50;
+  // 'code review' cuenta como terminado (100%): el trabajo está finalizado aunque no se pueda mergear aún.
+  if (['done','closed','resolved','completed','inactive','code review'].some(x => s.includes(x))) return 100;
+  if (['active','in progress','committed','in review','in-progress'].some(x => s.includes(x))) return 50;
   return 0;
 }
 
