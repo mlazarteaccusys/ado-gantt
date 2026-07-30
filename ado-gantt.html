@@ -479,6 +479,7 @@ async function fetchIterations() {
 
 // ─── Fetch work items ──────────────────────────────────────────────────────────
 let lastRaw = []; // cache para no re-fetchear al cambiar solo el equipo/sprint
+let linkParents = {}; // {childId: parentId} según los vínculos jerárquicos reales de ADO
 let currentAreaFilter = ''; // cláusula WHERE de area path activa
 
 const WI_FIELDS = [
@@ -503,6 +504,7 @@ async function fetchItemsByIds(ids) {
 
 // Wrapper: intenta la consulta jerárquica (recursiva desde Epics) y cae a la plana si falla.
 async function fetchWorkItems(areaFilter = '') {
+  linkParents = {}; // reset: si cae al fallback plano, se usa System.Parent
   try {
     const raw = await fetchWorkItemsHierarchy(areaFilter);
     if (raw && raw.length) return raw;
@@ -528,6 +530,10 @@ async function fetchWorkItemsHierarchy(areaFilter = '') {
   for (const rel of rels) {
     if (rel.source && rel.source.id) idSet.add(rel.source.id);
     if (rel.target && rel.target.id) idSet.add(rel.target.id);
+    // Vínculo real padre→hijo (source es el padre, target el hijo)
+    if (rel.source && rel.source.id && rel.target && rel.target.id) {
+      linkParents[rel.target.id] = rel.source.id;
+    }
   }
   const ids = [...idSet];
   if (!ids.length) return [];
@@ -626,7 +632,7 @@ function processItems(raw, iters) {
       id: item.id, title: f['System.Title'] || '(sin título)', type,
       state: f['System.State'] || 'New',
       iterPath: f['System.IterationPath'] || '',
-      parentId: f['System.Parent'] || null,
+      parentId: linkParents[item.id] || f['System.Parent'] || null,
       startDate, endDate, progress, iter, hasExplicitDates,
       assignee: assignee?.displayName || '',
       priority: f['Microsoft.VSTS.Common.Priority'] || 0,
