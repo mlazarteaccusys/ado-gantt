@@ -667,6 +667,60 @@ function buildFullTree() {
   collapseAll(fullTree);
 }
 
+// ─── Días hábiles (Argentina) ────────────────────────────────────────────────
+// Feriados nacionales. Editable: agregá/quitá fechas 'YYYY-MM-DD' según corresponda
+// (los "feriados puente"/no laborables se declaran cada año y no están incluidos).
+const AR_HOLIDAYS = new Set([
+  // 2026
+  '2026-01-01', // Año Nuevo
+  '2026-02-16','2026-02-17', // Carnaval
+  '2026-03-24', // Memoria por la Verdad y la Justicia
+  '2026-04-02', // Malvinas
+  '2026-04-03', // Viernes Santo
+  '2026-05-01', // Día del Trabajador
+  '2026-05-25', // Revolución de Mayo
+  '2026-06-15', // Güemes (trasladado)
+  '2026-06-20', // Día de la Bandera
+  '2026-07-09', // Independencia
+  '2026-08-17', // San Martín
+  '2026-10-12', // Diversidad Cultural
+  '2026-11-20', // Soberanía Nacional
+  '2026-12-08', // Inmaculada Concepción
+  '2026-12-25', // Navidad
+  // 2027 (fijos + Semana Santa/Carnaval calculados; trasladables/puentes pueden ajustarse)
+  '2027-01-01', // Año Nuevo
+  '2027-02-08','2027-02-09', // Carnaval
+  '2027-03-24', // Memoria
+  '2027-03-26', // Viernes Santo
+  '2027-04-02', // Malvinas
+  '2027-05-01', // Día del Trabajador
+  '2027-05-25', // Revolución de Mayo
+  '2027-06-20', // Día de la Bandera
+  '2027-07-09', // Independencia
+  '2027-12-08', // Inmaculada Concepción
+  '2027-12-25', // Navidad
+]);
+
+function isBusinessDay(d) {
+  const dow = d.getDay();               // 0 domingo … 6 sábado
+  if (dow === 0 || dow === 6) return false;
+  const key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  return !AR_HOLIDAYS.has(key);
+}
+
+// Días hábiles posteriores a `from` hasta `to` inclusive (excluye fin de semana y feriados AR)
+function businessDaysBetween(from, to) {
+  let count = 0;
+  const d = new Date(from.getFullYear(), from.getMonth(), from.getDate());
+  d.setDate(d.getDate() + 1);           // arrancar el día siguiente al planificado
+  const end = new Date(to.getFullYear(), to.getMonth(), to.getDate());
+  while (d <= end) {
+    if (isBusinessDay(d)) count++;
+    d.setDate(d.getDate() + 1);
+  }
+  return count;
+}
+
 // Flatten con soporte de filtro por tipo:
 // - Nodo visible + no colapsado → aparece y se recursa en hijos (depth+1)
 // - Nodo visible + colapsado    → aparece, NO se recursa
@@ -843,16 +897,19 @@ function render() {
       </div>`;
       // Desvío: si los hijos reales terminan después de la fecha planificada
       if (item.hasExplicitDates && item._maxDescEnd && item.endDate && item._maxDescEnd > item.endDate.getTime()) {
-        const plannedOff = doff(item.endDate);
-        const realOff = doff(new Date(item._maxDescEnd));
-        const overLeft = px(plannedOff + 1);
-        const overW = Math.max(px(realOff - plannedOff), 8);
-        const slipDays = Math.round((item._maxDescEnd - item.endDate.getTime()) / 86400000);
-        const slipTip = `Desvío de planificación&#10;${esc(item.type)} #${item.id}&#10;Planificado hasta: ${fmtD(item.endDate)}&#10;Proyectado (hijos): ${fmtD(new Date(item._maxDescEnd))}&#10;Atraso: +${slipDays} día(s)`;
-        barHtml += `<div class="gbar-over" style="left:${overLeft}px;width:${overW}px"
-          onmouseenter="showTip(event,'${slipTip}')" onmouseleave="hideTip()">
-          <span class="gbar-over-lbl">⚠ +${slipDays}d</span>
-        </div>`;
+        const realEnd = new Date(item._maxDescEnd);
+        const slipDays = businessDaysBetween(item.endDate, realEnd); // días hábiles (AR)
+        if (slipDays > 0) {
+          const plannedOff = doff(item.endDate);
+          const realOff = doff(realEnd);
+          const overLeft = px(plannedOff + 1);
+          const overW = Math.max(px(realOff - plannedOff), 8);
+          const slipTip = `Desvío de planificación&#10;${esc(item.type)} #${item.id}&#10;Planificado hasta: ${fmtD(item.endDate)}&#10;Proyectado (hijos): ${fmtD(realEnd)}&#10;Atraso: +${slipDays} día(s) hábiles`;
+          barHtml += `<div class="gbar-over" style="left:${overLeft}px;width:${overW}px"
+            onmouseenter="showTip(event,'${slipTip}')" onmouseleave="hideTip()">
+            <span class="gbar-over-lbl">⚠ +${slipDays}d</span>
+          </div>`;
+        }
       }
     } else if (item.iter) {
       const left = px(doff(item.iter.startDate));
