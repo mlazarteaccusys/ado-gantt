@@ -481,7 +481,61 @@ async function fetchIterations() {
 let lastRaw = []; // cache para no re-fetchear al cambiar solo el equipo/sprint
 let currentAreaFilter = ''; // cláusula WHERE de area path activa
 
+const WI_FIELDS = [
+  'System.Id','System.Title','System.WorkItemType','System.State',
+  'System.IterationPath','System.Parent','System.AssignedTo',
+  'Microsoft.VSTS.Scheduling.StartDate','Microsoft.VSTS.Scheduling.FinishDate',
+  'Microsoft.VSTS.Scheduling.TargetDate',
+  'Microsoft.VSTS.Scheduling.CompletedWork','Microsoft.VSTS.Scheduling.RemainingWork',
+  'Microsoft.VSTS.Scheduling.OriginalEstimate','Microsoft.VSTS.Common.Priority',
+].join(',');
+
+// Trae los campos de una lista de IDs (en lotes de 200)
+async function fetchItemsByIds(ids) {
+  const raw = [];
+  for (let i = 0; i < ids.length; i += 200) {
+    const chunk = ids.slice(i, i+200);
+    const d = await apiGet(`${base()}/_apis/wit/workitems?ids=${chunk.join(',')}&fields=${encodeURIComponent(WI_FIELDS)}&api-version=7.1`);
+    raw.push(...(d.value || []));
+  }
+  return raw;
+}
+
+// Wrapper: intenta la consulta jerárquica (recursiva desde Epics) y cae a la plana si falla.
 async function fetchWorkItems(areaFilter = '') {
+  try {
+    const raw = await fetchWorkItemsHierarchy(areaFilter);
+    if (raw && raw.length) return raw;
+    console.warn('Fetch jerárquico devolvió vacío, usando consulta plana.');
+  } catch (e) {
+    console.warn('Fetch jerárquico falló, usando consulta plana:', e);
+  }
+  return await fetchWorkItemsFlat(areaFilter);
+}
+
+// Consulta jerárquica: arranca en las Epics (con filtro de área del equipo) y baja
+// por los vínculos padre-hijo, trayendo TODOS los descendientes sin importar su área.
+async function fetchWorkItemsHierarchy(areaFilter = '') {
+  const srcArea = areaFilter ? areaFilter.replace(/\[System\.AreaPath\]/g, 'Source.[System.AreaPath]') : '';
+  const query = `SELECT [System.Id] FROM WorkItemLinks WHERE (Source.[System.WorkItemType] = 'Epic' AND Source.[System.State] NOT IN ('Removed','Cut','Cancelled','Rejected','Withdrawn') ${srcArea}) AND ([System.Links.LinkType] = 'System.LinkTypes.Hierarchy-Forward') AND (Target.[System.WorkItemType] IN ('Feature','User Story','Technical Task','Task','Bug','Improvement') AND Target.[System.State] NOT IN ('Removed','Cut','Cancelled','Rejected','Withdrawn')) MODE (Recursive)`;
+  const r = await fetch(`${base()}/_apis/wit/wiql?api-version=7.1`, {
+    method: 'POST', headers: authHdr(), body: JSON.stringify({ query })
+  });
+  if (!r.ok) throw new Error(`WIQL (jerárquico) falló: ${r.status} ${await r.text()}`);
+  const data = await r.json();
+  const rels = data.workItemRelations || [];
+  const idSet = new Set();
+  for (const rel of rels) {
+    if (rel.source && rel.source.id) idSet.add(rel.source.id);
+    if (rel.target && rel.target.id) idSet.add(rel.target.id);
+  }
+  const ids = [...idSet];
+  if (!ids.length) return [];
+  return fetchItemsByIds(ids);
+}
+
+// Consulta plana (fallback): lista chata con tope $top.
+async function fetchWorkItemsFlat(areaFilter = '') {
   const maxItems = cfg.maxItems || 500;
   const wiql = { query: `SELECT [System.Id] FROM WorkItems WHERE [System.TeamProject] = @project AND [System.WorkItemType] IN ('Epic','Feature','User Story','Technical Task','Task','Bug','Improvement') AND [System.State] NOT IN ('Removed','Cut','Cancelled','Rejected','Withdrawn') ${areaFilter} ORDER BY [System.WorkItemType] ASC, [System.Id] ASC` };
   const r = await fetch(`${base()}/_apis/wit/wiql?$top=${maxItems}&api-version=7.1`, {
@@ -490,24 +544,7 @@ async function fetchWorkItems(areaFilter = '') {
   if (!r.ok) throw new Error(`WIQL query falló: ${r.status} ${await r.text()}`);
   const { workItems: wis } = await r.json();
   if (!wis?.length) return [];
-
-  const ids = wis.map(w => w.id);
-  const fields = [
-    'System.Id','System.Title','System.WorkItemType','System.State',
-    'System.IterationPath','System.Parent','System.AssignedTo',
-    'Microsoft.VSTS.Scheduling.StartDate','Microsoft.VSTS.Scheduling.FinishDate',
-    'Microsoft.VSTS.Scheduling.TargetDate',
-    'Microsoft.VSTS.Scheduling.CompletedWork','Microsoft.VSTS.Scheduling.RemainingWork',
-    'Microsoft.VSTS.Scheduling.OriginalEstimate','Microsoft.VSTS.Common.Priority',
-  ].join(',');
-
-  const raw = [];
-  for (let i = 0; i < ids.length; i += 200) {
-    const chunk = ids.slice(i, i+200);
-    const d = await apiGet(`${base()}/_apis/wit/workitems?ids=${chunk.join(',')}&fields=${encodeURIComponent(fields)}&api-version=7.1`);
-    raw.push(...(d.value || []));
-  }
-  return raw;
+  return fetchItemsByIds(wis.map(w => w.id));
 }
 
 // ─── Process ───────────────────────────────────────────────────────────────────
