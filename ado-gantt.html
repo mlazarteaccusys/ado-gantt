@@ -222,8 +222,8 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; f
   </div>
   <div class="sep"></div>
   <div class="expand-btns">
-    <button class="btn btn-sq" title="Expandir todos los niveles" onclick="expandAll()">+</button>
-    <button class="btn btn-sq" title="Colapsar todos los niveles" onclick="collapseAll()">−</button>
+    <button class="btn btn-sq" title="Expandir un nivel" onclick="expandOneLevel()">+</button>
+    <button class="btn btn-sq" title="Colapsar un nivel" onclick="collapseOneLevel()">−</button>
   </div>
   <div class="sep"></div>
   <div class="filters">
@@ -1100,18 +1100,31 @@ function rerenderKeepScroll() {
   initResizeHandle();
   if (saved !== null) { const n = document.getElementById('tlScroll'); if (n) n.scrollLeft = saved; }
 }
-function expandAll() {
-  collapsed.clear();
+// Nodos actualmente visibles con su profundidad (un nodo es visible si todos sus ancestros están expandidos)
+function visibleNodesWithDepth() {
+  const out = [];
+  (function walk(nodes, depth) {
+    for (const n of nodes) {
+      out.push({ node: n, depth });
+      if (n.children && n.children.length && !collapsed.has(n.id)) walk(n.children, depth + 1);
+    }
+  })(fullTree, 0);
+  return out;
+}
+// "+" : expande un nivel — abre el nivel colapsado más superficial
+function expandOneLevel() {
+  const collapsedVisible = visibleNodesWithDepth().filter(v => v.node.children && v.node.children.length && collapsed.has(v.node.id));
+  if (!collapsedVisible.length) return;
+  const minD = Math.min(...collapsedVisible.map(v => v.depth));
+  collapsedVisible.filter(v => v.depth === minD).forEach(v => collapsed.delete(v.node.id));
   rerenderKeepScroll();
 }
-function collapseAll() {
-  collapsed.clear();
-  (function walk(nodes) {
-    for (const n of nodes) {
-      if (n.children && n.children.length) collapsed.add(n.id);
-      walk(n.children || []);
-    }
-  })(fullTree);
+// "−" : colapsa un nivel — cierra el nivel expandido más profundo
+function collapseOneLevel() {
+  const expandedVisible = visibleNodesWithDepth().filter(v => v.node.children && v.node.children.length && !collapsed.has(v.node.id));
+  if (!expandedVisible.length) return;
+  const maxD = Math.max(...expandedVisible.map(v => v.depth));
+  expandedVisible.filter(v => v.depth === maxD).forEach(v => collapsed.add(v.node.id));
   rerenderKeepScroll();
 }
 
