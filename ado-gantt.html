@@ -617,7 +617,9 @@ function buildFullTree() {
     for (const n of nodes) sortLevel(n.children);
   }
   sortLevel(roots);
-  fullTree = roots;
+  // Solo mostrar árboles que cuelgan de una Epic: se descartan Features,
+  // Stories, Tasks y Bugs que quedaron como raíz (sin Epic padre en los datos).
+  fullTree = roots.filter(r => r.type === 'Epic');
 
   // Calcular progreso bottom-up (desde hijos hacia padres)
   for (const root of fullTree) {
