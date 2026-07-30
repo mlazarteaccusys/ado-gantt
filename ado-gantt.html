@@ -132,6 +132,14 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; f
 .gbar-dash { position: absolute; height: 22px; top: 9px; border-radius: 4px; border: 2px dashed #ccc; display: flex; align-items: center; padding: 0 6px; overflow: hidden; opacity: 0.7; z-index: 4; }
 .gbar-dash .gbar-lbl { color: #999; }
 
+/* Tramo de desvío: los hijos terminan después de la fecha planificada */
+.gbar-over { position: absolute; height: 22px; top: 9px; border-radius: 0 4px 4px 0; z-index: 6; cursor: pointer;
+  display: flex; align-items: center; padding: 0 6px; overflow: hidden;
+  border-left: 2px solid #b91c1c;
+  background: repeating-linear-gradient(45deg, #ef4444, #ef4444 5px, #fecaca 5px, #fecaca 10px); }
+.gbar-over:hover { filter: brightness(0.92); }
+.gbar-over-lbl { font-size: 10px; color: #fff; font-weight: 700; white-space: nowrap; text-shadow: 0 1px 2px rgba(0,0,0,.5); }
+
 /* ── Today line ── */
 .today-line { position: absolute; top: 0; bottom: 0; width: 2px; background: #ef4444; z-index: 20; pointer-events: none; }
 .today-tip { position: absolute; top: -1px; left: -22px; background: #ef4444; color: white; font-size: 10px; font-weight: 700; padding: 2px 5px; border-radius: 3px; white-space: nowrap; }
@@ -548,12 +556,13 @@ function processItems(raw, iters) {
     const type = f['System.WorkItemType'];
     const iter = findIter(f['System.IterationPath']);
 
-    let startDate, endDate;
+    let startDate, endDate, hasExplicitDates = false;
 
     if (type === 'Epic' || type === 'Feature') {
-      // Epics y Features: usar StartDate y TargetDate explícitos
+      // Epics y Features: usar StartDate y TargetDate explícitos (planificación)
       startDate = parseAdoDate(f['Microsoft.VSTS.Scheduling.StartDate']);
       endDate   = parseAdoDate(f['Microsoft.VSTS.Scheduling.TargetDate'] || f['Microsoft.VSTS.Scheduling.FinishDate']);
+      hasExplicitDates = !!(startDate && endDate);
       // Si no tienen fechas explícitas, caer al sprint
       if (!startDate && iter) startDate = iter.startDate;
       if (!endDate   && iter) endDate   = iter.endDate;
@@ -572,7 +581,7 @@ function processItems(raw, iters) {
       state: f['System.State'] || 'New',
       iterPath: f['System.IterationPath'] || '',
       parentId: f['System.Parent'] || null,
-      startDate, endDate, progress, iter,
+      startDate, endDate, progress, iter, hasExplicitDates,
       assignee: assignee?.displayName || '',
       priority: f['Microsoft.VSTS.Common.Priority'] || 0,
       children: [],
@@ -620,6 +629,20 @@ function buildFullTree() {
   // Solo mostrar árboles que cuelgan de una Epic: se descartan Features,
   // Stories, Tasks y Bugs que quedaron como raíz (sin Epic padre en los datos).
   fullTree = roots.filter(r => r.type === 'Epic');
+
+  // Fecha real proyectada: la fecha de fin más tardía entre los descendientes.
+  // Sirve para detectar desvíos (US que se corrieron a sprints posteriores por carryover).
+  function computeMaxDescEnd(node) {
+    let maxc = null;
+    for (const c of node.children) {
+      computeMaxDescEnd(c);
+      const cEnd = c.endDate ? c.endDate.getTime() : null;
+      if (cEnd !== null) maxc = maxc === null ? cEnd : Math.max(maxc, cEnd);
+      if (c._maxDescEnd != null) maxc = maxc === null ? c._maxDescEnd : Math.max(maxc, c._maxDescEnd);
+    }
+    node._maxDescEnd = maxc;
+  }
+  for (const root of fullTree) computeMaxDescEnd(root);
 
   // Calcular progreso bottom-up (desde hijos hacia padres)
   for (const root of fullTree) {
@@ -818,6 +841,19 @@ function render() {
         <div class="gbar-prog" style="width:${progW}px"></div>
         <span class="gbar-lbl">${esc(item.title)}</span>
       </div>`;
+      // Desvío: si los hijos reales terminan después de la fecha planificada
+      if (item.hasExplicitDates && item._maxDescEnd && item.endDate && item._maxDescEnd > item.endDate.getTime()) {
+        const plannedOff = doff(item.endDate);
+        const realOff = doff(new Date(item._maxDescEnd));
+        const overLeft = px(plannedOff + 1);
+        const overW = Math.max(px(realOff - plannedOff), 8);
+        const slipDays = Math.round((item._maxDescEnd - item.endDate.getTime()) / 86400000);
+        const slipTip = `Desvío de planificación&#10;${esc(item.type)} #${item.id}&#10;Planificado hasta: ${fmtD(item.endDate)}&#10;Proyectado (hijos): ${fmtD(new Date(item._maxDescEnd))}&#10;Atraso: +${slipDays} día(s)`;
+        barHtml += `<div class="gbar-over" style="left:${overLeft}px;width:${overW}px"
+          onmouseenter="showTip(event,'${slipTip}')" onmouseleave="hideTip()">
+          <span class="gbar-over-lbl">⚠ +${slipDays}d</span>
+        </div>`;
+      }
     } else if (item.iter) {
       const left = px(doff(item.iter.startDate));
       const days = Math.max(doff(item.iter.endDate) - doff(item.iter.startDate) + 1, 1);
