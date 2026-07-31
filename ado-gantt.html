@@ -95,7 +95,8 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; f
 .cbtn { background: none; border: none; cursor: pointer; font-size: 9px; color: #999; width: 14px; flex-shrink: 0; line-height: 1; }
 .cbtn:hover { color: #333; }
 .iicon { font-size: 13px; flex-shrink: 0; }
-.ititle { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ititle { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: inherit; text-decoration: none; cursor: pointer; }
+a.ititle:hover { color: #0078d4; text-decoration: underline; }
 
 /* ── Status badge ── */
 .sbadge { display: inline-flex; align-items: center; gap: 3px; padding: 2px 7px; border-radius: 10px; font-size: 10px; font-weight: 600; white-space: nowrap; }
@@ -308,6 +309,8 @@ function authHdr() {
   return { 'Authorization': 'Basic ' + btoa(':' + cfg.pat), 'Content-Type': 'application/json' };
 }
 function base() { return `https://dev.azure.com/${encodeURIComponent(cfg.org)}/${encodeURIComponent(cfg.project)}`; }
+// URL del work item en Azure DevOps
+function wiUrl(id) { return `${base()}/_workitems/edit/${id}`; }
 
 async function apiGet(url) {
   const r = await fetch(url, { headers: authHdr() });
@@ -923,7 +926,7 @@ function render() {
           <div class="item-name">
             ${cbtn}
             <span class="iicon">${typeIcon(item.type)}</span>
-            <span class="ititle" title="${esc(item.title)}">${esc(item.title)}</span>
+            <a class="ititle" href="${wiUrl(item.id)}" target="_blank" rel="noopener" title="${esc(item.title)} — abrir #${item.id} en Azure DevOps">${esc(item.title)}</a>
           </div>
         </div>
         <div class="l-cell"><span class="sbadge ${statusCls(item.state)}">${esc(item.state)}</span></div>
@@ -945,6 +948,7 @@ function render() {
       const progW = w * item.progress / 100;
       const dashedStyle = item.hasExplicitDates ? '' : 'opacity:0.75;';
       barHtml = `<div class="gbar ${barCls(item.type)}" style="left:${left}px;width:${w}px;${dashedStyle}"
+        onclick="window.open(wiUrl(${item.id}),'_blank','noopener')"
         onmouseenter="showTip(event,'${esc(tipText).replace(/\n/g,'&#10;')}')" onmouseleave="hideTip()">
         <div class="gbar-prog" style="width:${progW}px"></div>
         <span class="gbar-lbl">${esc(item.title)}</span>
@@ -970,6 +974,7 @@ function render() {
       const days = Math.max(doff(item.iter.endDate) - doff(item.iter.startDate) + 1, 1);
       const w = Math.max(px(days), 6);
       barHtml = `<div class="gbar-dash" style="left:${left}px;width:${w}px"
+        onclick="window.open(wiUrl(${item.id}),'_blank','noopener')"
         onmouseenter="showTip(event,'${esc(tipText).replace(/\n/g,'&#10;')}')" onmouseleave="hideTip()">
         <span class="gbar-lbl">${esc(item.title)}</span>
       </div>`;
