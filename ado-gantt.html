@@ -64,8 +64,8 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; f
 .g-right { flex: 1; overflow-x: auto; overflow-y: hidden; position: relative; }
 
 /* ── Left header ── */
-:root { --name-col: 220px; }
-.lh { display: grid; grid-template-columns: var(--name-col) 95px 110px 72px 145px; background: #f7f8fa; border-bottom: 2px solid #e0e0e0; height: 65px; }
+:root { --name-col: 220px; --estado-col: 95px; --horas-col: 110px; --prog-col: 72px; --periodo-col: 145px; }
+.lh { display: grid; grid-template-columns: var(--name-col) var(--estado-col) var(--horas-col) var(--prog-col) var(--periodo-col); background: #f7f8fa; border-bottom: 2px solid #e0e0e0; height: 65px; }
 .lh-cell { padding: 0 10px; display: flex; align-items: center; font-size: 11px; font-weight: 700; color: #666; text-transform: uppercase; letter-spacing: 0.4px; border-right: 1px solid #e8e8e8; position: relative; }
 .col-resize { position: absolute; right: 0; top: 0; bottom: 0; width: 6px; cursor: col-resize; background: transparent; z-index: 10; }
 .col-resize:hover, .col-resize.dragging { background: #0078d4; opacity: 0.5; }
@@ -85,7 +85,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; f
 .g-row:nth-child(odd) .l-row, .g-row:nth-child(odd) .t-row { background: #fafafa; }
 .g-row:hover .l-row, .g-row:hover .t-row { background: #f0f6ff !important; }
 
-.l-row { display: grid; grid-template-columns: var(--name-col) 95px 110px 72px 145px; height: 40px; border-right: 2px solid #e0e0e0; border-bottom: 1px solid #f0f0f0; }
+.l-row { display: grid; grid-template-columns: var(--name-col) var(--estado-col) var(--horas-col) var(--prog-col) var(--periodo-col); height: 40px; border-right: 2px solid #e0e0e0; border-bottom: 1px solid #f0f0f0; }
 .l-cell { padding: 0 8px; display: flex; align-items: center; border-right: 1px solid #f0f0f0; overflow: hidden; font-size: 12px; }
 
 .t-row { position: relative; height: 40px; border-bottom: 1px solid #f0f0f0; }
@@ -913,7 +913,7 @@ function render() {
   const todayOff = doff(today);
 
   // Left panel width = name col + fixed cols
-  const LW = nameColW + 95 + 110 + 72 + 145;
+  const LW = totalLeftW();
 
   // ── Months row ──────────────────────────────────────────────────────────────
   let monthsHtml = '';
@@ -1041,11 +1041,11 @@ function render() {
       <div class="gantt-inner">
         <div class="g-left" style="width:${LW}px">
           <div class="lh">
-            <div class="lh-cell">Nombre<div class="col-resize" id="nameResizeHandle"></div></div>
-            <div class="lh-cell">Estado</div>
-            <div class="lh-cell">Horas</div>
-            <div class="lh-cell">Progreso</div>
-            <div class="lh-cell">Período</div>
+            <div class="lh-cell">Nombre<div class="col-resize" data-col="--name-col" data-min="120"></div></div>
+            <div class="lh-cell">Estado<div class="col-resize" data-col="--estado-col" data-min="60"></div></div>
+            <div class="lh-cell">Horas<div class="col-resize" data-col="--horas-col" data-min="60"></div></div>
+            <div class="lh-cell">Progreso<div class="col-resize" data-col="--prog-col" data-min="50"></div></div>
+            <div class="lh-cell">Período<div class="col-resize" data-col="--periodo-col" data-min="80"></div></div>
           </div>
           <div class="g-body" id="leftBody">${leftRows}</div>
         </div>
@@ -1099,36 +1099,39 @@ function hideTip() { document.getElementById('tooltip').style.display = 'none'; 
 document.addEventListener('mousemove', e => { if (document.getElementById('tooltip').style.display !== 'none') moveTip(e); });
 
 // ─── Column resize ────────────────────────────────────────────────────────────
-let nameColW = 220;
+const colWidths = { '--name-col': 220, '--estado-col': 95, '--horas-col': 110, '--prog-col': 72, '--periodo-col': 145 };
+function totalLeftW() { return Object.values(colWidths).reduce((a, b) => a + b, 0); }
 
 function initResizeHandle() {
-  const handle = document.getElementById('nameResizeHandle');
-  if (!handle) return;
-  let startX, startW;
-  handle.addEventListener('mousedown', e => {
-    startX = e.clientX;
-    startW = nameColW;
-    handle.classList.add('dragging');
-    document.body.style.cursor = 'col-resize';
-    document.body.style.userSelect = 'none';
+  document.querySelectorAll('.lh .col-resize').forEach(handle => {
+    const col = handle.dataset.col;
+    const min = parseInt(handle.dataset.min) || 50;
+    if (!col) return;
+    handle.addEventListener('mousedown', e => {
+      const startX = e.clientX;
+      const startW = colWidths[col];
+      handle.classList.add('dragging');
+      document.body.style.cursor = 'col-resize';
+      document.body.style.userSelect = 'none';
 
-    const onMove = e => {
-      const w = Math.max(120, Math.min(600, startW + e.clientX - startX));
-      nameColW = w;
-      document.documentElement.style.setProperty('--name-col', w + 'px');
-      const gLeft = document.querySelector('.g-left');
-      if (gLeft) gLeft.style.width = (w + 95 + 110 + 72 + 145) + 'px';
-    };
-    const onUp = () => {
-      handle.classList.remove('dragging');
-      document.body.style.cursor = '';
-      document.body.style.userSelect = '';
-      document.removeEventListener('mousemove', onMove);
-      document.removeEventListener('mouseup', onUp);
-    };
-    document.addEventListener('mousemove', onMove);
-    document.addEventListener('mouseup', onUp);
-    e.preventDefault();
+      const onMove = ev => {
+        const w = Math.max(min, Math.min(900, startW + ev.clientX - startX));
+        colWidths[col] = w;
+        document.documentElement.style.setProperty(col, w + 'px');
+        const gLeft = document.querySelector('.g-left');
+        if (gLeft) gLeft.style.width = totalLeftW() + 'px';
+      };
+      const onUp = () => {
+        handle.classList.remove('dragging');
+        document.body.style.cursor = '';
+        document.body.style.userSelect = '';
+        document.removeEventListener('mousemove', onMove);
+        document.removeEventListener('mouseup', onUp);
+      };
+      document.addEventListener('mousemove', onMove);
+      document.addEventListener('mouseup', onUp);
+      e.preventDefault();
+    });
   });
 }
 
