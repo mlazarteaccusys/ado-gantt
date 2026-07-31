@@ -312,6 +312,22 @@ function base() { return `https://dev.azure.com/${encodeURIComponent(cfg.org)}/$
 // URL del work item en Azure DevOps
 function wiUrl(id) { return `${base()}/_workitems/edit/${id}`; }
 
+// Diagnóstico: en la consola escribí  diag(10052)  (solo el número, sin comillas)
+function diag(id) {
+  id = +id;
+  const raw  = (lastRaw||[]).find(x => x.id === id);
+  const proc = (workItems||[]).find(x => x.id === id);
+  let inTree = false, path = [];
+  (function w(nodes, p){ (nodes||[]).forEach(n => { const np = p.concat([n.type + '#' + n.id]); if (n.id === id) { inTree = true; path = np; } w(n.children, np); }); })(fullTree, []);
+  const parent = proc ? (workItems||[]).find(x => x.id === proc.parentId) : null;
+  console.log('=== diag ' + id + ' ===');
+  console.log('fetched?', !!raw, raw ? { type: raw.fields['System.WorkItemType'], state: raw.fields['System.State'], parentField: raw.fields['System.Parent'], area: raw.fields['System.AreaPath'] } : null);
+  console.log('linkParent:', linkParents[id]);
+  console.log('inWorkItems?', !!proc, proc ? { parentId: proc.parentId, parentInSet: !!parent } : null);
+  console.log('inTree?', inTree, path.join(' > '));
+  console.log('activeTypes tiene este tipo?', raw ? activeTypes.has(raw.fields['System.WorkItemType']) : 'n/a');
+}
+
 async function apiGet(url) {
   const r = await fetch(url, { headers: authHdr() });
   if (!r.ok) { const t = await r.text(); throw new Error(`GET ${url}\n→ ${r.status}: ${t.slice(0,300)}`); }
@@ -531,8 +547,8 @@ async function fetchWorkItemsHierarchy(areaFilter = '') {
   // Sin filtro: anclar solo en Epics/Improvements para no traer el proyecto entero.
   const sourceCond = srcArea
     ? `Source.[System.State] ${NOTREM} ${srcArea}`
-    : `Source.[System.WorkItemType] IN ('Epic','Improvement') AND Source.[System.State] ${NOTREM}`;
-  const query = `SELECT [System.Id] FROM WorkItemLinks WHERE (${sourceCond}) AND ([System.Links.LinkType] = 'System.LinkTypes.Hierarchy-Forward') AND (Target.[System.WorkItemType] IN ('Feature','User Story','Technical Task','Task','Bug','Improvement') AND Target.[System.State] ${NOTREM}) MODE (Recursive)`;
+    : `Source.[System.WorkItemType] IN ('Epic','Improvement','Improvements') AND Source.[System.State] ${NOTREM}`;
+  const query = `SELECT [System.Id] FROM WorkItemLinks WHERE (${sourceCond}) AND ([System.Links.LinkType] = 'System.LinkTypes.Hierarchy-Forward') AND (Target.[System.WorkItemType] IN ('Feature','User Story','Technical Task','Task','Bug','Improvement','Improvements') AND Target.[System.State] ${NOTREM}) MODE (Recursive)`;
   const r = await fetch(`${base()}/_apis/wit/wiql?api-version=7.1`, {
     method: 'POST', headers: authHdr(), body: JSON.stringify({ query })
   });
@@ -556,7 +572,7 @@ async function fetchWorkItemsHierarchy(areaFilter = '') {
 // Consulta plana (fallback): lista chata con tope $top.
 async function fetchWorkItemsFlat(areaFilter = '') {
   const maxItems = cfg.maxItems || 500;
-  const wiql = { query: `SELECT [System.Id] FROM WorkItems WHERE [System.TeamProject] = @project AND [System.WorkItemType] IN ('Epic','Feature','User Story','Technical Task','Task','Bug','Improvement') AND [System.State] NOT IN ('Removed','Cut','Cancelled','Rejected','Withdrawn') ${areaFilter} ORDER BY [System.WorkItemType] ASC, [System.Id] ASC` };
+  const wiql = { query: `SELECT [System.Id] FROM WorkItems WHERE [System.TeamProject] = @project AND [System.WorkItemType] IN ('Epic','Feature','User Story','Technical Task','Task','Bug','Improvement','Improvements') AND [System.State] NOT IN ('Removed','Cut','Cancelled','Rejected','Withdrawn') ${areaFilter} ORDER BY [System.WorkItemType] ASC, [System.Id] ASC` };
   const r = await fetch(`${base()}/_apis/wit/wiql?$top=${maxItems}&api-version=7.1`, {
     method: 'POST', headers: authHdr(), body: JSON.stringify(wiql)
   });
@@ -618,7 +634,9 @@ function processItems(raw, iters) {
 
   return raw.map(item => {
     const f = item.fields || {};
-    const type = f['System.WorkItemType'];
+    // Normalizar tipo: en este ADO el tipo es "Improvements" (plural); lo mapeamos a "Improvement"
+    let type = f['System.WorkItemType'];
+    if (type === 'Improvements') type = 'Improvement';
     const iter = findIter(f['System.IterationPath']);
 
     let startDate, endDate, hasExplicitDates = false;
