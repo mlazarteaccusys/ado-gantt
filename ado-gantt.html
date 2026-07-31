@@ -521,11 +521,18 @@ async function fetchWorkItems(areaFilter = '') {
   return [...byId.values()];
 }
 
-// Consulta jerárquica: arranca en las Epics (con filtro de área del equipo) y baja
-// por los vínculos padre-hijo, trayendo TODOS los descendientes sin importar su área.
+// Consulta jerárquica: ancla en ítems del área del equipo y baja por los vínculos
+// padre-hijo, trayendo TODOS los descendientes sin importar su área (así no se pierden
+// hijos —p. ej. Improvements— que estén en otra área que la de su padre).
 async function fetchWorkItemsHierarchy(areaFilter = '') {
+  const NOTREM = "NOT IN ('Removed','Cut','Cancelled','Rejected','Withdrawn')";
   const srcArea = areaFilter ? areaFilter.replace(/\[System\.AreaPath\]/g, 'Source.[System.AreaPath]') : '';
-  const query = `SELECT [System.Id] FROM WorkItemLinks WHERE (Source.[System.WorkItemType] IN ('Epic','Improvement') AND Source.[System.State] NOT IN ('Removed','Cut','Cancelled','Rejected','Withdrawn') ${srcArea}) AND ([System.Links.LinkType] = 'System.LinkTypes.Hierarchy-Forward') AND (Target.[System.WorkItemType] IN ('Feature','User Story','Technical Task','Task','Bug','Improvement') AND Target.[System.State] NOT IN ('Removed','Cut','Cancelled','Rejected','Withdrawn')) MODE (Recursive)`;
+  // Con filtro de equipo: anclar en CUALQUIER ítem del área (Epic, Feature, etc.).
+  // Sin filtro: anclar solo en Epics/Improvements para no traer el proyecto entero.
+  const sourceCond = srcArea
+    ? `Source.[System.State] ${NOTREM} ${srcArea}`
+    : `Source.[System.WorkItemType] IN ('Epic','Improvement') AND Source.[System.State] ${NOTREM}`;
+  const query = `SELECT [System.Id] FROM WorkItemLinks WHERE (${sourceCond}) AND ([System.Links.LinkType] = 'System.LinkTypes.Hierarchy-Forward') AND (Target.[System.WorkItemType] IN ('Feature','User Story','Technical Task','Task','Bug','Improvement') AND Target.[System.State] ${NOTREM}) MODE (Recursive)`;
   const r = await fetch(`${base()}/_apis/wit/wiql?api-version=7.1`, {
     method: 'POST', headers: authHdr(), body: JSON.stringify({ query })
   });
