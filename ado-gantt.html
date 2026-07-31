@@ -42,6 +42,8 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; f
 .btn:hover { background: #f5f5f5; }
 .btn.primary { background: #0078d4; color: white; border-color: #0078d4; }
 .btn.primary:hover { background: #006cbd; }
+.expand-btns { display: flex; gap: 4px; }
+.btn-sq { padding: 3px 9px; font-size: 15px; font-weight: 700; line-height: 1; min-width: 28px; }
 .last-update { font-size: 11px; color: #aaa; white-space: nowrap; }
 /* ── Team dropdown ── */
 .team-select-wrap { display: flex; align-items: center; gap: 6px; }
@@ -93,7 +95,8 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; f
 .cbtn { background: none; border: none; cursor: pointer; font-size: 9px; color: #999; width: 14px; flex-shrink: 0; line-height: 1; }
 .cbtn:hover { color: #333; }
 .iicon { font-size: 13px; flex-shrink: 0; }
-.ititle { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ititle { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: inherit; text-decoration: none; cursor: pointer; }
+a.ititle:hover { color: #0078d4; text-decoration: underline; }
 
 /* ── Status badge ── */
 .sbadge { display: inline-flex; align-items: center; gap: 3px; padding: 2px 7px; border-radius: 10px; font-size: 10px; font-weight: 600; white-space: nowrap; }
@@ -219,6 +222,11 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; f
     </select>
   </div>
   <div class="sep"></div>
+  <div class="expand-btns">
+    <button class="btn btn-sq" title="Expandir un nivel" onclick="expandOneLevel()">+</button>
+    <button class="btn btn-sq" title="Colapsar un nivel" onclick="collapseOneLevel()">−</button>
+  </div>
+  <div class="sep"></div>
   <div class="filters">
     <span class="filter-label">Mostrar:</span>
     <span class="chip on epic"    data-t="Epic"        onclick="toggleChip(this)">👑 Epics</span>
@@ -258,6 +266,8 @@ let tlStart = null, tlDays = 0;
 // ─── Config ────────────────────────────────────────────────────────────────────
 function loadCfg() {
   try { cfg = JSON.parse(localStorage.getItem('adoGanttCfg2') || '{}'); } catch(e) { cfg = {}; }
+  // Equipo por defecto al abrir (una sola vez): usa el Team de la config o "Evolutivo Team"
+  if (!selectedTeam) selectedTeam = cfg.team || 'Evolutivo Team';
   if (cfg.org && cfg.project && cfg.pat) {
     document.getElementById('configOverlay').style.display = 'none';
     loadData();
@@ -299,6 +309,24 @@ function authHdr() {
   return { 'Authorization': 'Basic ' + btoa(':' + cfg.pat), 'Content-Type': 'application/json' };
 }
 function base() { return `https://dev.azure.com/${encodeURIComponent(cfg.org)}/${encodeURIComponent(cfg.project)}`; }
+// URL del work item en Azure DevOps
+function wiUrl(id) { return `${base()}/_workitems/edit/${id}`; }
+
+// Diagnóstico: en la consola escribí  diag(10052)  (solo el número, sin comillas)
+function diag(id) {
+  id = +id;
+  const raw  = (lastRaw||[]).find(x => x.id === id);
+  const proc = (workItems||[]).find(x => x.id === id);
+  let inTree = false, path = [];
+  (function w(nodes, p){ (nodes||[]).forEach(n => { const np = p.concat([n.type + '#' + n.id]); if (n.id === id) { inTree = true; path = np; } w(n.children, np); }); })(fullTree, []);
+  const parent = proc ? (workItems||[]).find(x => x.id === proc.parentId) : null;
+  console.log('=== diag ' + id + ' ===');
+  console.log('fetched?', !!raw, raw ? { type: raw.fields['System.WorkItemType'], state: raw.fields['System.State'], parentField: raw.fields['System.Parent'], area: raw.fields['System.AreaPath'] } : null);
+  console.log('linkParent:', linkParents[id]);
+  console.log('inWorkItems?', !!proc, proc ? { parentId: proc.parentId, parentInSet: !!parent } : null);
+  console.log('inTree?', inTree, path.join(' > '));
+  console.log('activeTypes tiene este tipo?', raw ? activeTypes.has(raw.fields['System.WorkItemType']) : 'n/a');
+}
 
 async function apiGet(url) {
   const r = await fetch(url, { headers: authHdr() });
@@ -470,35 +498,88 @@ async function fetchIterations() {
 
 // ─── Fetch work items ──────────────────────────────────────────────────────────
 let lastRaw = []; // cache para no re-fetchear al cambiar solo el equipo/sprint
+let linkParents = {}; // {childId: parentId} según los vínculos jerárquicos reales de ADO
 let currentAreaFilter = ''; // cláusula WHERE de area path activa
 
+const WI_FIELDS = [
+  'System.Id','System.Title','System.WorkItemType','System.State',
+  'System.IterationPath','System.Parent','System.AssignedTo',
+  'Microsoft.VSTS.Scheduling.StartDate','Microsoft.VSTS.Scheduling.FinishDate',
+  'Microsoft.VSTS.Scheduling.TargetDate',
+  'Microsoft.VSTS.Scheduling.CompletedWork','Microsoft.VSTS.Scheduling.RemainingWork',
+  'Microsoft.VSTS.Scheduling.OriginalEstimate','Microsoft.VSTS.Common.Priority',
+].join(',');
+
+// Trae los campos de una lista de IDs (en lotes de 200)
+async function fetchItemsByIds(ids) {
+  const raw = [];
+  for (let i = 0; i < ids.length; i += 200) {
+    const chunk = ids.slice(i, i+200);
+    const d = await apiGet(`${base()}/_apis/wit/workitems?ids=${chunk.join(',')}&fields=${encodeURIComponent(WI_FIELDS)}&api-version=7.1`);
+    raw.push(...(d.value || []));
+  }
+  return raw;
+}
+
+// Wrapper: combina la consulta jerárquica (descendientes de Epics, sin importar área/tope)
+// con la plana (todos los tipos del área, incl. Improvements). Une por id.
 async function fetchWorkItems(areaFilter = '') {
+  linkParents = {}; // se puebla con la jerárquica; los ítems solo-planos usan System.Parent
+  let hierRaw = [], flatRaw = [];
+  try { hierRaw = await fetchWorkItemsHierarchy(areaFilter); }
+  catch (e) { console.warn('Fetch jerárquico falló:', e); }
+  try { flatRaw = await fetchWorkItemsFlat(areaFilter); }
+  catch (e) { console.warn('Fetch plano falló:', e); }
+  // Unir por id (la jerárquica pisa a la plana, mismos campos)
+  const byId = new Map();
+  for (const it of flatRaw) byId.set(it.id, it);
+  for (const it of hierRaw) byId.set(it.id, it);
+  return [...byId.values()];
+}
+
+// Consulta jerárquica: ancla en ítems del área del equipo y baja por los vínculos
+// padre-hijo, trayendo TODOS los descendientes sin importar su área (así no se pierden
+// hijos —p. ej. Improvements— que estén en otra área que la de su padre).
+async function fetchWorkItemsHierarchy(areaFilter = '') {
+  const NOTREM = "NOT IN ('Removed','Cut','Cancelled','Rejected','Withdrawn')";
+  const srcArea = areaFilter ? areaFilter.replace(/\[System\.AreaPath\]/g, 'Source.[System.AreaPath]') : '';
+  // Con filtro de equipo: anclar en CUALQUIER ítem del área (Epic, Feature, etc.).
+  // Sin filtro: anclar solo en Epics/Improvements para no traer el proyecto entero.
+  const sourceCond = srcArea
+    ? `Source.[System.State] ${NOTREM} ${srcArea}`
+    : `Source.[System.WorkItemType] IN ('Epic','Improvement','Improvements') AND Source.[System.State] ${NOTREM}`;
+  const query = `SELECT [System.Id] FROM WorkItemLinks WHERE (${sourceCond}) AND ([System.Links.LinkType] = 'System.LinkTypes.Hierarchy-Forward') AND (Target.[System.WorkItemType] IN ('Feature','User Story','Technical Task','Task','Bug','Improvement','Improvements') AND Target.[System.State] ${NOTREM}) MODE (Recursive)`;
+  const r = await fetch(`${base()}/_apis/wit/wiql?api-version=7.1`, {
+    method: 'POST', headers: authHdr(), body: JSON.stringify({ query })
+  });
+  if (!r.ok) throw new Error(`WIQL (jerárquico) falló: ${r.status} ${await r.text()}`);
+  const data = await r.json();
+  const rels = data.workItemRelations || [];
+  const idSet = new Set();
+  for (const rel of rels) {
+    if (rel.source && rel.source.id) idSet.add(rel.source.id);
+    if (rel.target && rel.target.id) idSet.add(rel.target.id);
+    // Vínculo real padre→hijo (source es el padre, target el hijo)
+    if (rel.source && rel.source.id && rel.target && rel.target.id) {
+      linkParents[rel.target.id] = rel.source.id;
+    }
+  }
+  const ids = [...idSet];
+  if (!ids.length) return [];
+  return fetchItemsByIds(ids);
+}
+
+// Consulta plana (fallback): lista chata con tope $top.
+async function fetchWorkItemsFlat(areaFilter = '') {
   const maxItems = cfg.maxItems || 500;
-  const wiql = { query: `SELECT [System.Id] FROM WorkItems WHERE [System.TeamProject] = @project AND [System.WorkItemType] IN ('Epic','Feature','User Story','Technical Task','Task','Bug','Improvement') AND [System.State] NOT IN ('Removed','Cut','Cancelled','Rejected','Withdrawn') ${areaFilter} ORDER BY [System.WorkItemType] ASC, [System.Id] ASC` };
+  const wiql = { query: `SELECT [System.Id] FROM WorkItems WHERE [System.TeamProject] = @project AND [System.WorkItemType] IN ('Epic','Feature','User Story','Technical Task','Task','Bug','Improvement','Improvements') AND [System.State] NOT IN ('Removed','Cut','Cancelled','Rejected','Withdrawn') ${areaFilter} ORDER BY [System.WorkItemType] ASC, [System.Id] ASC` };
   const r = await fetch(`${base()}/_apis/wit/wiql?$top=${maxItems}&api-version=7.1`, {
     method: 'POST', headers: authHdr(), body: JSON.stringify(wiql)
   });
   if (!r.ok) throw new Error(`WIQL query falló: ${r.status} ${await r.text()}`);
   const { workItems: wis } = await r.json();
   if (!wis?.length) return [];
-
-  const ids = wis.map(w => w.id);
-  const fields = [
-    'System.Id','System.Title','System.WorkItemType','System.State',
-    'System.IterationPath','System.Parent','System.AssignedTo',
-    'Microsoft.VSTS.Scheduling.StartDate','Microsoft.VSTS.Scheduling.FinishDate',
-    'Microsoft.VSTS.Scheduling.TargetDate',
-    'Microsoft.VSTS.Scheduling.CompletedWork','Microsoft.VSTS.Scheduling.RemainingWork',
-    'Microsoft.VSTS.Scheduling.OriginalEstimate','Microsoft.VSTS.Common.Priority',
-  ].join(',');
-
-  const raw = [];
-  for (let i = 0; i < ids.length; i += 200) {
-    const chunk = ids.slice(i, i+200);
-    const d = await apiGet(`${base()}/_apis/wit/workitems?ids=${chunk.join(',')}&fields=${encodeURIComponent(fields)}&api-version=7.1`);
-    raw.push(...(d.value || []));
-  }
-  return raw;
+  return fetchItemsByIds(wis.map(w => w.id));
 }
 
 // ─── Process ───────────────────────────────────────────────────────────────────
@@ -553,7 +634,9 @@ function processItems(raw, iters) {
 
   return raw.map(item => {
     const f = item.fields || {};
-    const type = f['System.WorkItemType'];
+    // Normalizar tipo: en este ADO el tipo es "Improvements" (plural); lo mapeamos a "Improvement"
+    let type = f['System.WorkItemType'];
+    if (type === 'Improvements') type = 'Improvement';
     const iter = findIter(f['System.IterationPath']);
 
     let startDate, endDate, hasExplicitDates = false;
@@ -580,7 +663,7 @@ function processItems(raw, iters) {
       id: item.id, title: f['System.Title'] || '(sin título)', type,
       state: f['System.State'] || 'New',
       iterPath: f['System.IterationPath'] || '',
-      parentId: f['System.Parent'] || null,
+      parentId: linkParents[item.id] || f['System.Parent'] || null,
       startDate, endDate, progress, iter, hasExplicitDates,
       assignee: assignee?.displayName || '',
       priority: f['Microsoft.VSTS.Common.Priority'] || 0,
@@ -595,8 +678,9 @@ const TYPE_ORDER = { 'Epic': 0, 'Feature': 1, 'User Story': 2, 'Technical Task':
 // Progreso basado en estado del item
 function stateToProgress(state) {
   const s = (state || '').toLowerCase();
-  if (['done','closed','resolved','completed','inactive'].some(x => s.includes(x))) return 100;
-  if (['active','in progress','committed','in review','code review','in-progress'].some(x => s.includes(x))) return 50;
+  // 'code review' cuenta como terminado (100%): el trabajo está finalizado aunque no se pueda mergear aún.
+  if (['done','closed','resolved','completed','inactive','code review'].some(x => s.includes(x))) return 100;
+  if (['active','in progress','committed','in review','in-progress'].some(x => s.includes(x))) return 50;
   return 0;
 }
 
@@ -626,9 +710,9 @@ function buildFullTree() {
     for (const n of nodes) sortLevel(n.children);
   }
   sortLevel(roots);
-  // Solo mostrar árboles que cuelgan de una Epic: se descartan Features,
-  // Stories, Tasks y Bugs que quedaron como raíz (sin Epic padre en los datos).
-  fullTree = roots.filter(r => r.type === 'Epic');
+  // Mostrar árboles que cuelgan de una Epic; se descartan Features, Stories, Tasks
+  // y Bugs que quedaron como raíz (sin Epic padre). Los Improvements raíz SÍ se muestran.
+  fullTree = roots.filter(r => r.type === 'Epic' || r.type === 'Improvement');
 
   // Fecha real proyectada: la fecha de fin más tardía entre los descendientes.
   // Sirve para detectar desvíos (US que se corrieron a sprints posteriores por carryover).
@@ -636,6 +720,7 @@ function buildFullTree() {
     let maxc = null;
     for (const c of node.children) {
       computeMaxDescEnd(c);
+      if (c.type === 'Bug' || c.type === 'Improvement') continue; // Bugs e Improvements no cuentan para el desvío/retraso
       const cEnd = c.endDate ? c.endDate.getTime() : null;
       if (cEnd !== null) maxc = maxc === null ? cEnd : Math.max(maxc, cEnd);
       if (c._maxDescEnd != null) maxc = maxc === null ? c._maxDescEnd : Math.max(maxc, c._maxDescEnd);
@@ -869,7 +954,7 @@ function render() {
           <div class="item-name">
             ${cbtn}
             <span class="iicon">${typeIcon(item.type)}</span>
-            <span class="ititle" title="${esc(item.title)}">${esc(item.title)}</span>
+            <a class="ititle" href="${wiUrl(item.id)}" target="_blank" rel="noopener" title="${esc(item.title)} — abrir #${item.id} en Azure DevOps">${esc(item.title)}</a>
           </div>
         </div>
         <div class="l-cell"><span class="sbadge ${statusCls(item.state)}">${esc(item.state)}</span></div>
@@ -891,6 +976,7 @@ function render() {
       const progW = w * item.progress / 100;
       const dashedStyle = item.hasExplicitDates ? '' : 'opacity:0.75;';
       barHtml = `<div class="gbar ${barCls(item.type)}" style="left:${left}px;width:${w}px;${dashedStyle}"
+        onclick="window.open(wiUrl(${item.id}),'_blank','noopener')"
         onmouseenter="showTip(event,'${esc(tipText).replace(/\n/g,'&#10;')}')" onmouseleave="hideTip()">
         <div class="gbar-prog" style="width:${progW}px"></div>
         <span class="gbar-lbl">${esc(item.title)}</span>
@@ -916,6 +1002,7 @@ function render() {
       const days = Math.max(doff(item.iter.endDate) - doff(item.iter.startDate) + 1, 1);
       const w = Math.max(px(days), 6);
       barHtml = `<div class="gbar-dash" style="left:${left}px;width:${w}px"
+        onclick="window.open(wiUrl(${item.id}),'_blank','noopener')"
         onmouseenter="showTip(event,'${esc(tipText).replace(/\n/g,'&#10;')}')" onmouseleave="hideTip()">
         <span class="gbar-lbl">${esc(item.title)}</span>
       </div>`;
@@ -1041,6 +1128,43 @@ function toggleChip(el) {
   if (activeTypes.has(t)) { activeTypes.delete(t); el.classList.remove('on'); }
   else { activeTypes.add(t); el.classList.add('on'); }
   render();
+}
+
+// Expandir / colapsar todos los niveles (como en Azure DevOps)
+function rerenderKeepScroll() {
+  const tl = document.getElementById('tlScroll');
+  const saved = tl ? tl.scrollLeft : null;
+  render.skipScroll = true;
+  render();
+  initResizeHandle();
+  if (saved !== null) { const n = document.getElementById('tlScroll'); if (n) n.scrollLeft = saved; }
+}
+// Nodos actualmente visibles con su profundidad (un nodo es visible si todos sus ancestros están expandidos)
+function visibleNodesWithDepth() {
+  const out = [];
+  (function walk(nodes, depth) {
+    for (const n of nodes) {
+      out.push({ node: n, depth });
+      if (n.children && n.children.length && !collapsed.has(n.id)) walk(n.children, depth + 1);
+    }
+  })(fullTree, 0);
+  return out;
+}
+// "+" : expande un nivel — abre el nivel colapsado más superficial
+function expandOneLevel() {
+  const collapsedVisible = visibleNodesWithDepth().filter(v => v.node.children && v.node.children.length && collapsed.has(v.node.id));
+  if (!collapsedVisible.length) return;
+  const minD = Math.min(...collapsedVisible.map(v => v.depth));
+  collapsedVisible.filter(v => v.depth === minD).forEach(v => collapsed.delete(v.node.id));
+  rerenderKeepScroll();
+}
+// "−" : colapsa un nivel — cierra el nivel expandido más profundo
+function collapseOneLevel() {
+  const expandedVisible = visibleNodesWithDepth().filter(v => v.node.children && v.node.children.length && !collapsed.has(v.node.id));
+  if (!expandedVisible.length) return;
+  const maxD = Math.max(...expandedVisible.map(v => v.depth));
+  expandedVisible.filter(v => v.depth === maxD).forEach(v => collapsed.add(v.node.id));
+  rerenderKeepScroll();
 }
 
 // ─── Load ─────────────────────────────────────────────────────────────────────
