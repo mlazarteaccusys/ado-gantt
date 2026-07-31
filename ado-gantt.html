@@ -3,34 +3,39 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>ADO Gantt Chart</title>
+<title>Gantt Probatch</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
-body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 13px; background: #f0f2f5; color: #333; }
+body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 13px; background: #f4f5f7; color: #1f2937; -webkit-font-smoothing: antialiased; }
 
 /* ── Config overlay ── */
 .config-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.55); z-index: 200; display: flex; align-items: center; justify-content: center; }
-.config-box { background: white; padding: 32px; border-radius: 10px; width: 500px; box-shadow: 0 12px 40px rgba(0,0,0,0.25); }
+.config-box { background: white; padding: 32px; border-radius: 16px; width: 500px; box-shadow: 0 20px 50px rgba(16,24,40,0.22); }
 .config-box h2 { margin-bottom: 6px; font-size: 18px; }
 .config-box p { font-size: 12px; color: #888; margin-bottom: 24px; }
 .config-field { margin-bottom: 16px; }
 .config-field label { display: block; font-weight: 600; margin-bottom: 4px; font-size: 11px; color: #555; text-transform: uppercase; letter-spacing: 0.5px; }
-.config-field input { width: 100%; padding: 9px 12px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px; transition: border-color .15s; }
-.config-field input:focus { outline: none; border-color: #0078d4; box-shadow: 0 0 0 3px rgba(0,120,212,.12); }
+.config-field input { width: 100%; padding: 10px 12px; border: 1px solid #e2e4e9; border-radius: 8px; font-size: 14px; transition: border-color .15s; }
+.config-field input:focus { outline: none; border-color: #2563eb; box-shadow: 0 0 0 3px rgba(37,99,235,.14); }
 .config-field small { display: block; margin-top: 4px; font-size: 11px; color: #888; }
 .config-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-.config-btn { background: #0078d4; color: white; border: none; padding: 11px 24px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: 600; width: 100%; margin-top: 8px; transition: background .15s; }
-.config-btn:hover { background: #006cbd; }
+.config-btn { background: #2563eb; color: white; border: none; padding: 12px 24px; border-radius: 10px; cursor: pointer; font-size: 14px; font-weight: 600; width: 100%; margin-top: 8px; transition: background .15s; box-shadow: 0 2px 6px rgba(37,99,235,.3); }
+.config-btn:hover { background: #1d4ed8; }
 
 /* ── Top bar ── */
-.topbar { background: white; border-bottom: 1px solid #e0e0e0; padding: 10px 20px; display: flex; align-items: center; gap: 12px; position: sticky; top: 0; z-index: 100; box-shadow: 0 1px 4px rgba(0,0,0,.06); flex-wrap: wrap; }
-.topbar h1 { font-size: 15px; font-weight: 700; }
-.topbar .sep { width: 1px; height: 20px; background: #e0e0e0; }
+.topbar { background: white; border-bottom: 1px solid #e8eaed; padding: 11px 22px; display: flex; align-items: center; gap: 12px; position: sticky; top: 0; z-index: 100; box-shadow: 0 1px 3px rgba(16,24,40,.06); flex-wrap: wrap; }
+.brand { display: flex; align-items: center; gap: 9px; }
+.brand-logo { width: 30px; height: 30px; border-radius: 8px; background: linear-gradient(135deg,#2563eb,#1d4ed8); color: #fff; font-size: 12px; font-weight: 800; letter-spacing: .5px; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 6px rgba(37,99,235,.35); }
+.topbar h1 { font-size: 15px; font-weight: 700; color: #111827; letter-spacing: -.2px; }
+.topbar .sep { width: 1px; height: 20px; background: #e8eaed; }
 .topbar .spacer { flex: 1; }
 .filters { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
 .filter-label { font-size: 11px; color: #888; }
-.chip { padding: 3px 10px; border-radius: 12px; border: 1.5px solid #ddd; background: white; cursor: pointer; font-size: 11px; font-weight: 500; transition: all .15s; user-select: none; }
-.chip.on { border-color: #0078d4; background: #e8f3ff; color: #0078d4; }
+.chip { padding: 4px 12px; border-radius: 999px; border: 1.5px solid #e5e7eb; background: white; cursor: pointer; font-size: 11px; font-weight: 600; transition: all .15s; user-select: none; }
+.chip.on { border-color: #2563eb; background: #e8f3ff; color: #2563eb; }
 .chip.on.epic { border-color: #7c3aed; background: #f3eeff; color: #7c3aed; }
 .chip.on.feature { border-color: #2563eb; background: #eff6ff; color: #2563eb; }
 .chip.on.story { border-color: #059669; background: #ecfdf5; color: #059669; }
@@ -38,18 +43,18 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; f
 .chip.on.task { border-color: #d97706; background: #fffbeb; color: #d97706; }
 .chip.on.bug { border-color: #dc2626; background: #fef2f2; color: #dc2626; }
 .chip.on.improvement { border-color: #7c3aed; background: #f5f3ff; color: #7c3aed; }
-.btn { padding: 6px 14px; border-radius: 6px; border: 1px solid #ddd; background: white; cursor: pointer; font-size: 12px; font-weight: 500; transition: background .15s; }
-.btn:hover { background: #f5f5f5; }
-.btn.primary { background: #0078d4; color: white; border-color: #0078d4; }
-.btn.primary:hover { background: #006cbd; }
+.btn { padding: 7px 15px; border-radius: 8px; border: 1px solid #e2e4e9; background: white; cursor: pointer; font-size: 12px; font-weight: 600; color: #374151; transition: all .15s; }
+.btn:hover { background: #f6f7f9; border-color: #d1d5db; }
+.btn.primary { background: #2563eb; color: white; border-color: #2563eb; box-shadow: 0 1px 2px rgba(37,99,235,.25); }
+.btn.primary:hover { background: #1d4ed8; border-color: #1d4ed8; }
 .expand-btns { display: flex; gap: 4px; }
 .btn-sq { padding: 3px 9px; font-size: 15px; font-weight: 700; line-height: 1; min-width: 28px; }
 .last-update { font-size: 11px; color: #aaa; white-space: nowrap; }
 /* ── Team dropdown ── */
 .team-select-wrap { display: flex; align-items: center; gap: 6px; }
 .team-select-wrap label { font-size: 11px; color: #888; white-space: nowrap; }
-#teamSelect { padding: 5px 10px; border: 1px solid #ddd; border-radius: 6px; font-size: 12px; background: white; cursor: pointer; min-width: 160px; max-width: 240px; }
-#teamSelect:focus { outline: none; border-color: #0078d4; }
+#teamSelect { padding: 6px 11px; border: 1px solid #e2e4e9; border-radius: 8px; font-size: 12px; background: white; cursor: pointer; min-width: 160px; max-width: 240px; font-weight: 500; }
+#teamSelect:focus { outline: none; border-color: #2563eb; }
 #teamSelect:disabled { color: #aaa; cursor: default; }
 
 /* ── Main wrapper ── */
@@ -68,7 +73,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; f
 .lh { display: grid; grid-template-columns: var(--name-col) var(--estado-col) var(--horas-col) var(--prog-col) var(--periodo-col); background: #f7f8fa; border-bottom: 2px solid #e0e0e0; height: 65px; }
 .lh-cell { padding: 0 10px; display: flex; align-items: center; font-size: 11px; font-weight: 700; color: #666; text-transform: uppercase; letter-spacing: 0.4px; border-right: 1px solid #e8e8e8; position: relative; }
 .col-resize { position: absolute; right: 0; top: 0; bottom: 0; width: 6px; cursor: col-resize; background: transparent; z-index: 10; }
-.col-resize:hover, .col-resize.dragging { background: #0078d4; opacity: 0.5; }
+.col-resize:hover, .col-resize.dragging { background: #2563eb; opacity: 0.5; }
 
 /* ── Timeline header ── */
 .th { background: #f7f8fa; border-bottom: 2px solid #e0e0e0; position: sticky; top: 0; z-index: 10; }
@@ -96,7 +101,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; f
 .cbtn:hover { color: #333; }
 .iicon { font-size: 13px; flex-shrink: 0; }
 .ititle { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: inherit; text-decoration: none; cursor: pointer; }
-a.ititle:hover { color: #0078d4; text-decoration: underline; }
+a.ititle:hover { color: #2563eb; text-decoration: underline; }
 
 /* ── Status badge ── */
 .sbadge { display: inline-flex; align-items: center; gap: 3px; padding: 2px 7px; border-radius: 10px; font-size: 10px; font-weight: 600; white-space: nowrap; }
@@ -154,7 +159,7 @@ a.ititle:hover { color: #0078d4; text-decoration: underline; }
 
 /* ── Loading / error ── */
 .loading { display: flex; align-items: center; justify-content: center; padding: 80px; flex-direction: column; gap: 14px; color: #666; }
-.spinner { width: 36px; height: 36px; border: 3px solid #e5e7eb; border-top-color: #0078d4; border-radius: 50%; animation: spin .8s linear infinite; }
+.spinner { width: 36px; height: 36px; border: 3px solid #e5e7eb; border-top-color: #2563eb; border-radius: 50%; animation: spin .8s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 .err { margin: 24px; padding: 18px; background: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; color: #b91c1c; font-size: 13px; line-height: 1.6; }
 .err strong { display: block; margin-bottom: 6px; }
@@ -166,7 +171,7 @@ a.ititle:hover { color: #0078d4; text-decoration: underline; }
 /* ── Panel de Horas ── */
 #hoursPanel { padding: 16px 20px; background: #fafbfc; border-bottom: 1px solid #e0e0e0; }
 .hp-cards { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 18px; }
-.hp-card { flex: 1; min-width: 160px; background: white; border: 1px solid #e5e7eb; border-radius: 10px; padding: 14px 16px; }
+.hp-card { flex: 1; min-width: 160px; background: white; border: 1px solid #e8eaed; border-radius: 12px; padding: 15px 17px; box-shadow: 0 1px 2px rgba(16,24,40,.04); }
 .hp-card.warn { background: #fefce8; border-color: #fde68a; }
 .hp-card.bad  { background: #fef2f2; border-color: #fecaca; }
 .hp-card .lbl { font-size: 11px; color: #6b7280; text-transform: uppercase; letter-spacing: .4px; font-weight: 600; }
@@ -248,7 +253,7 @@ a.ititle:hover { color: #0078d4; text-decoration: underline; }
 
 <!-- Top bar -->
 <div class="topbar">
-  <h1>📊 ADO Gantt</h1>
+  <div class="brand"><span class="brand-logo">GP</span><h1>Gantt Probatch</h1></div>
   <div class="sep"></div>
   <div class="team-select-wrap">
     <label>Equipo:</label>
