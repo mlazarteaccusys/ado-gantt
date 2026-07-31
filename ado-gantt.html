@@ -720,7 +720,7 @@ function buildFullTree() {
     let maxc = null;
     for (const c of node.children) {
       computeMaxDescEnd(c);
-      if (c.type === 'Bug') continue; // los bugs no cuentan para el desvío/retraso
+      if (c.type === 'Bug' || c.type === 'Improvement') continue; // Bugs e Improvements no cuentan para el desvío/retraso
       const cEnd = c.endDate ? c.endDate.getTime() : null;
       if (cEnd !== null) maxc = maxc === null ? cEnd : Math.max(maxc, cEnd);
       if (c._maxDescEnd != null) maxc = maxc === null ? c._maxDescEnd : Math.max(maxc, c._maxDescEnd);
