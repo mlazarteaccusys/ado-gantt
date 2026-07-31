@@ -312,22 +312,6 @@ function base() { return `https://dev.azure.com/${encodeURIComponent(cfg.org)}/$
 // URL del work item en Azure DevOps
 function wiUrl(id) { return `${base()}/_workitems/edit/${id}`; }
 
-// Diagnóstico: en la consola escribí  diag(10052)  (solo el número, sin comillas)
-function diag(id) {
-  id = +id;
-  const raw  = (lastRaw||[]).find(x => x.id === id);
-  const proc = (workItems||[]).find(x => x.id === id);
-  let inTree = false, path = [];
-  (function w(nodes, p){ (nodes||[]).forEach(n => { const np = p.concat([n.type + '#' + n.id]); if (n.id === id) { inTree = true; path = np; } w(n.children, np); }); })(fullTree, []);
-  const parent = proc ? (workItems||[]).find(x => x.id === proc.parentId) : null;
-  console.log('=== diag ' + id + ' ===');
-  console.log('fetched?', !!raw, raw ? { type: raw.fields['System.WorkItemType'], state: raw.fields['System.State'], parentField: raw.fields['System.Parent'], area: raw.fields['System.AreaPath'] } : null);
-  console.log('linkParent:', linkParents[id]);
-  console.log('inWorkItems?', !!proc, proc ? { parentId: proc.parentId, parentInSet: !!parent } : null);
-  console.log('inTree?', inTree, path.join(' > '));
-  console.log('activeTypes tiene este tipo?', raw ? activeTypes.has(raw.fields['System.WorkItemType']) : 'n/a');
-}
-
 async function apiGet(url) {
   const r = await fetch(url, { headers: authHdr() });
   if (!r.ok) { const t = await r.text(); throw new Error(`GET ${url}\n→ ${r.status}: ${t.slice(0,300)}`); }
