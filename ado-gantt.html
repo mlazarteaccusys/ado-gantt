@@ -162,6 +162,36 @@ a.ititle:hover { color: #0078d4; text-decoration: underline; }
 
 /* ── Tooltip ── */
 .gtt { position: fixed; background: #1e293b; color: white; font-size: 12px; padding: 8px 12px; border-radius: 6px; pointer-events: none; z-index: 999; max-width: 280px; line-height: 1.5; display: none; box-shadow: 0 4px 12px rgba(0,0,0,.3); }
+
+/* ── Panel de Horas ── */
+#hoursPanel { padding: 16px 20px; background: #fafbfc; border-bottom: 1px solid #e0e0e0; }
+.hp-cards { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 18px; }
+.hp-card { flex: 1; min-width: 160px; background: white; border: 1px solid #e5e7eb; border-radius: 10px; padding: 14px 16px; }
+.hp-card.warn { background: #fefce8; border-color: #fde68a; }
+.hp-card.bad  { background: #fef2f2; border-color: #fecaca; }
+.hp-card .lbl { font-size: 11px; color: #6b7280; text-transform: uppercase; letter-spacing: .4px; font-weight: 600; }
+.hp-card .val { font-size: 26px; font-weight: 800; margin-top: 4px; color: #1f2937; }
+.hp-card.warn .val { color: #b45309; }
+.hp-card.bad  .val { color: #b91c1c; }
+.hp-card .sub { font-size: 11px; color: #9ca3af; margin-top: 3px; }
+.hp-title { font-size: 13px; font-weight: 700; color: white; background: #334155; padding: 8px 12px; border-radius: 6px; margin-bottom: 14px; }
+.hp-row { margin-bottom: 14px; }
+.hp-row-head { display: flex; justify-content: space-between; align-items: baseline; font-size: 13px; margin-bottom: 5px; }
+.hp-row-name { font-weight: 700; color: #1f2937; }
+.hp-row-fig { font-size: 12px; color: #6b7280; }
+.hp-row-fig b.ok   { color: #15803d; }
+.hp-row-fig b.warn { color: #b45309; }
+.hp-row-fig b.bad  { color: #b91c1c; }
+.hp-bar { position: relative; height: 22px; background: #e5e7eb; border-radius: 5px; overflow: hidden; }
+.hp-bar-est { position: absolute; left: 0; top: 0; height: 100%; background: #2563eb; border-radius: 5px 0 0 5px; }
+.hp-bar-real { position: absolute; top: -2px; bottom: -2px; width: 3px; }
+.hp-legend { font-size: 11px; color: #9ca3af; display: flex; gap: 16px; align-items: center; margin-top: 6px; }
+.hp-legend .sw { display: inline-block; width: 12px; height: 10px; border-radius: 2px; margin-right: 4px; vertical-align: middle; }
+/* Inline en filas de Epic */
+.hp-inline { font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 8px; margin-left: 6px; white-space: nowrap; }
+.hp-inline.ok   { background: #dcfce7; color: #15803d; }
+.hp-inline.warn { background: #fef3c7; color: #b45309; }
+.hp-inline.bad  { background: #fee2e2; color: #b91c1c; }
 </style>
 </head>
 <body>
@@ -207,6 +237,11 @@ a.ititle:hover { color: #0078d4; text-decoration: underline; }
       <textarea id="cfgSprints" rows="6" style="width:100%;padding:8px 12px;border:1px solid #ddd;border-radius:6px;font-size:12px;font-family:monospace;resize:vertical"></textarea>
       <small>Si está completo, se usa en lugar de los sprints de ADO. Borrar para volver a ADO.</small>
     </div>
+    <div class="config-field">
+      <label>Horas por etapa <span style="font-weight:400;text-transform:none">(pegá el reporte semanal: bloques "id - nombre" y "consumidas de estimadas")</span></label>
+      <textarea id="cfgHours" rows="6" style="width:100%;padding:8px 12px;border:1px solid #ddd;border-radius:6px;font-size:12px;font-family:monospace;resize:vertical" placeholder="121930 - ACCUSYS-PROBATCH NV-FASE 0-Core Estable&#10;645,5 de 360"></textarea>
+      <small>Coma decimal (645,5). Las líneas "Accusys" se ignoran. Se muestra en el panel de Horas y en las filas de Epic.</small>
+    </div>
     <button class="config-btn" onclick="saveConfig()">Cargar Gantt →</button>
   </div>
 </div>
@@ -239,12 +274,14 @@ a.ititle:hover { color: #0078d4; text-decoration: underline; }
   </div>
   <div class="spacer"></div>
   <span class="last-update" id="lastUpdate"></span>
+  <button class="btn" id="hoursBtn" onclick="toggleHoursPanel()" style="display:none">📊 Horas</button>
   <button class="btn" onclick="showConfig()">⚙️ Config</button>
   <button class="btn primary" onclick="loadData()">↻ Actualizar</button>
 </div>
 
 <!-- Page -->
 <div class="page">
+  <div id="hoursPanel" style="display:none"></div>
   <div id="mount"></div>
 </div>
 
@@ -287,6 +324,7 @@ function saveConfig() {
     dayW: parseInt(document.getElementById('cfgDayW').value) || 28,
     maxItems: parseInt(document.getElementById('cfgMax').value) || 500,
     manualSprints: document.getElementById('cfgSprints').value,
+    hoursText: document.getElementById('cfgHours').value,
   };
   localStorage.setItem('adoGanttCfg2', JSON.stringify(cfg));
   document.getElementById('configOverlay').style.display = 'none';
@@ -301,6 +339,7 @@ function showConfig() {
   document.getElementById('cfgDayW').value = cfg.dayW || 28;
   document.getElementById('cfgMax').value = cfg.maxItems || 500;
   document.getElementById('cfgSprints').value = cfg.manualSprints !== undefined ? cfg.manualSprints : MANUAL_SPRINTS_DEFAULT;
+  document.getElementById('cfgHours').value = cfg.hoursText || '';
   document.getElementById('configOverlay').style.display = 'flex';
 }
 
@@ -388,6 +427,7 @@ async function onTeamChange(teamName) {
     lastRaw = raw;
     workItems = processItems(raw, iters);
     buildFullTree();
+    refreshHours();
     const ts = new Date().toLocaleTimeString('es', { hour:'2-digit', minute:'2-digit' });
     document.getElementById('lastUpdate').textContent = `↻ ${ts} · ${workItems.length} items · ${iters.length} sprints`;
     render();
@@ -938,7 +978,7 @@ function render() {
           <div class="item-name">
             ${cbtn}
             <span class="iicon">${typeIcon(item.type)}</span>
-            <a class="ititle" href="${wiUrl(item.id)}" target="_blank" rel="noopener" title="${esc(item.title)} — abrir #${item.id} en Azure DevOps">${esc(item.title)}</a>
+            <a class="ititle" href="${wiUrl(item.id)}" target="_blank" rel="noopener" title="${esc(item.title)} — abrir #${item.id} en Azure DevOps">${esc(item.title)}</a>${hoursByEpic[item.id] ? (() => { const h = hoursByEpic[item.id]; const cls = hoursClass(h.real, h.est); const pct = h.est ? Math.round(h.real / h.est * 100) : 0; return `<span class="hp-inline ${cls}" title="Horas: ${fmtHrs(h.real)} consumidas de ${fmtHrs(h.est)} estimadas">${fmtHrs(h.real)}/${fmtHrs(h.est)}h · ${pct}%</span>`; })() : ''}
           </div>
         </div>
         <div class="l-cell"><span class="sbadge ${statusCls(item.state)}">${esc(item.state)}</span></div>
@@ -1151,6 +1191,133 @@ function collapseOneLevel() {
   rerenderKeepScroll();
 }
 
+// ─── Horas por etapa (reporte semanal) ───────────────────────────────────────
+let hoursData = [];       // [{extId, name, est, real, epicId}]
+let hoursByEpic = {};     // {epicId: entry}
+
+function parseNum(s) { return parseFloat(String(s).replace(/\./g, '').replace(',', '.')) || 0; }
+
+// Parsea el bloque pegado: líneas "id - nombre" seguidas de "consumidas de estimadas"
+function parseHours(text) {
+  const out = [];
+  const lines = String(text || '').split('\n').map(l => l.trim());
+  let cur = null;
+  for (const line of lines) {
+    if (!line || /^accusys$/i.test(line)) continue;
+    const mHead = line.match(/^(\d{3,})\s*[-–]\s*(.+)$/);
+    const mNums = line.match(/^([\d.,]+)\s+de\s+([\d.,]+)$/i);
+    if (mHead) {
+      cur = { extId: mHead[1], name: mHead[2].trim(), est: 0, real: 0, epicId: null };
+      out.push(cur);
+    } else if (mNums && cur) {
+      cur.real = parseNum(mNums[1]);
+      cur.est  = parseNum(mNums[2]);
+    }
+  }
+  return out.filter(e => e.est || e.real);
+}
+
+// Tokens normalizados para matchear nombres de etapa con las Epics del árbol
+function normTokens(s) {
+  return String(s || '').toUpperCase()
+    .normalize('NFD').replace(/[̀-ͯ]/g, '')
+    .replace(/ACCUSYS|PROBATCH|NV|CORE|UX|WEB|MODERNIZATION|MIGRATION|CON|INTELIGENCIA|ARTIFICIAL|DE|LA|EL/g, ' ')
+    .replace(/[^A-Z0-9 ]/g, ' ')
+    .split(/\s+/).filter(t => t.length > 1);
+}
+
+// Asocia cada entrada de horas a una Epic del árbol por similitud de nombre
+function matchHoursToEpics() {
+  hoursByEpic = {};
+  const epics = (fullTree || []).filter(n => n.type === 'Epic');
+  for (const e of hoursData) {
+    const et = normTokens(e.name);
+    const eV2 = /\bV2\b/i.test(e.name);
+    let best = null, bestScore = 0;
+    for (const ep of epics) {
+      const pt = normTokens(ep.title);
+      const pV2 = /\bV2\b/i.test(ep.title);
+      let score = et.filter(t => pt.includes(t)).length;
+      if (eV2 !== pV2) score -= 5;          // desambiguar Transversal V1 vs V2
+      if (score > bestScore) { bestScore = score; best = ep; }
+    }
+    e.epicId = bestScore >= 1 ? best.id : null;
+    if (e.epicId) hoursByEpic[e.epicId] = e;
+  }
+}
+
+function hoursClass(real, est) {
+  if (!est) return 'ok';
+  const pct = real / est;
+  if (pct > 1.05) return 'bad';
+  if (pct > 1.0)  return 'warn';
+  return 'ok';
+}
+function fmtHrs(n) { return (Math.round(n * 10) / 10).toLocaleString('es-AR'); }
+
+function renderHoursPanel() {
+  const panel = document.getElementById('hoursPanel');
+  const btn = document.getElementById('hoursBtn');
+  if (!hoursData.length) { panel.style.display = 'none'; btn.style.display = 'none'; return; }
+  btn.style.display = '';
+  if (!panel.dataset.userToggled) panel.style.display = 'block';
+
+  const totEst = hoursData.reduce((a, e) => a + e.est, 0);
+  const totReal = hoursData.reduce((a, e) => a + e.real, 0);
+  const desvio = totReal - totEst;
+  const pctTot = totEst ? Math.round(totReal / totEst * 1000) / 10 : 0;
+  // Concentración: etapa con mayor desvío absoluto (real - est)
+  let conc = null;
+  for (const e of hoursData) { if (!conc || (e.real - e.est) > (conc.real - conc.est)) conc = e; }
+  const concShort = conc ? (conc.name.match(/FASE[^:,-]*/i) || [conc.name])[0].trim() : '—';
+  const concD = conc ? conc.real - conc.est : 0;
+  const concPct = conc && conc.est ? Math.round(conc.real / conc.est * 100) : 0;
+
+  const desvClass = desvio > totEst * 0.05 ? 'bad' : (desvio > 0 ? 'warn' : 'ok');
+  const max = Math.max(...hoursData.map(e => Math.max(e.est, e.real)), 1);
+
+  let bars = '';
+  for (const e of hoursData) {
+    const cls = hoursClass(e.real, e.est);
+    const pct = e.est ? Math.round(e.real / e.est * 100) : 0;
+    const realColor = cls === 'bad' ? '#dc2626' : (cls === 'warn' ? '#d97706' : '#16a34a');
+    bars += `<div class="hp-row">
+      <div class="hp-row-head">
+        <span class="hp-row-name">${esc(e.name)}</span>
+        <span class="hp-row-fig">${fmtHrs(e.est)} est · <b class="${cls}">${fmtHrs(e.real)} real (${pct}%)</b></span>
+      </div>
+      <div class="hp-bar">
+        <div class="hp-bar-est" style="width:${e.est / max * 100}%"></div>
+        <div class="hp-bar-real" style="left:calc(${e.real / max * 100}% - 1px);background:${realColor}"></div>
+      </div>
+    </div>`;
+  }
+
+  panel.innerHTML = `
+    <div class="hp-cards">
+      <div class="hp-card"><div class="lbl">Horas estimadas</div><div class="val">${fmtHrs(totEst)}</div><div class="sub">Línea base de ${hoursData.length} etapas</div></div>
+      <div class="hp-card"><div class="lbl">Horas consumidas</div><div class="val">${fmtHrs(totReal)}</div><div class="sub">${pctTot}% de la línea base</div></div>
+      <div class="hp-card ${desvClass}"><div class="lbl">Desvío total</div><div class="val">${desvio >= 0 ? '+' : ''}${fmtHrs(desvio)} hs</div><div class="sub">${desvio >= 0 ? '+' : ''}${totEst ? Math.round(desvio / totEst * 1000) / 10 : 0}% sobre lo estimado</div></div>
+      <div class="hp-card bad"><div class="lbl">Concentración del desvío</div><div class="val">${esc(concShort)}</div><div class="sub">${concD >= 0 ? '+' : ''}${fmtHrs(concD)} hs (${concPct}% de su base)</div></div>
+    </div>
+    <div class="hp-title">Consumo por etapa (estimado vs. real)</div>
+    ${bars}
+    <div class="hp-legend"><span><span class="sw" style="background:#2563eb"></span>Horas estimadas</span><span><span class="sw" style="background:#16a34a;width:3px"></span>Real consumido</span></div>`;
+}
+
+function toggleHoursPanel() {
+  const panel = document.getElementById('hoursPanel');
+  panel.dataset.userToggled = '1';
+  panel.style.display = (panel.style.display === 'none' || !panel.style.display) ? 'block' : 'none';
+}
+
+// Re-parsea las horas, las asocia a Epics y refresca el panel
+function refreshHours() {
+  hoursData = parseHours(cfg.hoursText);
+  matchHoursToEpics();
+  renderHoursPanel();
+}
+
 // ─── Load ─────────────────────────────────────────────────────────────────────
 async function loadData() {
   const mount = document.getElementById('mount');
@@ -1176,6 +1343,7 @@ async function loadData() {
     lastRaw    = raw;
     workItems  = processItems(raw, iters);
     buildFullTree();
+    refreshHours();
 
     // Populate team dropdown
     populateTeamDropdown();
