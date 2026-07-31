@@ -525,7 +525,7 @@ async function fetchWorkItems(areaFilter = '') {
 // por los vínculos padre-hijo, trayendo TODOS los descendientes sin importar su área.
 async function fetchWorkItemsHierarchy(areaFilter = '') {
   const srcArea = areaFilter ? areaFilter.replace(/\[System\.AreaPath\]/g, 'Source.[System.AreaPath]') : '';
-  const query = `SELECT [System.Id] FROM WorkItemLinks WHERE (Source.[System.WorkItemType] = 'Epic' AND Source.[System.State] NOT IN ('Removed','Cut','Cancelled','Rejected','Withdrawn') ${srcArea}) AND ([System.Links.LinkType] = 'System.LinkTypes.Hierarchy-Forward') AND (Target.[System.WorkItemType] IN ('Feature','User Story','Technical Task','Task','Bug','Improvement') AND Target.[System.State] NOT IN ('Removed','Cut','Cancelled','Rejected','Withdrawn')) MODE (Recursive)`;
+  const query = `SELECT [System.Id] FROM WorkItemLinks WHERE (Source.[System.WorkItemType] IN ('Epic','Improvement') AND Source.[System.State] NOT IN ('Removed','Cut','Cancelled','Rejected','Withdrawn') ${srcArea}) AND ([System.Links.LinkType] = 'System.LinkTypes.Hierarchy-Forward') AND (Target.[System.WorkItemType] IN ('Feature','User Story','Technical Task','Task','Bug','Improvement') AND Target.[System.State] NOT IN ('Removed','Cut','Cancelled','Rejected','Withdrawn')) MODE (Recursive)`;
   const r = await fetch(`${base()}/_apis/wit/wiql?api-version=7.1`, {
     method: 'POST', headers: authHdr(), body: JSON.stringify({ query })
   });
@@ -685,9 +685,9 @@ function buildFullTree() {
     for (const n of nodes) sortLevel(n.children);
   }
   sortLevel(roots);
-  // Solo mostrar árboles que cuelgan de una Epic: se descartan Features,
-  // Stories, Tasks y Bugs que quedaron como raíz (sin Epic padre en los datos).
-  fullTree = roots.filter(r => r.type === 'Epic');
+  // Mostrar árboles que cuelgan de una Epic; se descartan Features, Stories, Tasks
+  // y Bugs que quedaron como raíz (sin Epic padre). Los Improvements raíz SÍ se muestran.
+  fullTree = roots.filter(r => r.type === 'Epic' || r.type === 'Improvement');
 
   // Fecha real proyectada: la fecha de fin más tardía entre los descendientes.
   // Sirve para detectar desvíos (US que se corrieron a sprints posteriores por carryover).
