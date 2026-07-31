@@ -1194,6 +1194,7 @@ function collapseOneLevel() {
 // ─── Horas por etapa (reporte semanal) ───────────────────────────────────────
 let hoursData = [];       // [{extId, name, est, real, epicId}]
 let hoursByEpic = {};     // {epicId: entry}
+let hoursBarsCollapsed = false;  // estado del colapso de la sección de barras
 
 function parseNum(s) { return parseFloat(String(s).replace(/\./g, '').replace(',', '.')) || 0; }
 
@@ -1300,15 +1301,25 @@ function renderHoursPanel() {
       <div class="hp-card ${desvClass}"><div class="lbl">Desvío total</div><div class="val">${desvio >= 0 ? '+' : ''}${fmtHrs(desvio)} hs</div><div class="sub">${desvio >= 0 ? '+' : ''}${totEst ? Math.round(desvio / totEst * 1000) / 10 : 0}% sobre lo estimado</div></div>
       <div class="hp-card bad"><div class="lbl">Concentración del desvío</div><div class="val">${esc(concShort)}</div><div class="sub">${concD >= 0 ? '+' : ''}${fmtHrs(concD)} hs (${concPct}% de su base)</div></div>
     </div>
-    <div class="hp-title">Consumo por etapa (estimado vs. real)</div>
-    ${bars}
-    <div class="hp-legend"><span><span class="sw" style="background:#2563eb"></span>Horas estimadas</span><span><span class="sw" style="background:#16a34a;width:3px"></span>Real consumido</span></div>`;
+    <div class="hp-title" onclick="toggleHoursBars()" style="cursor:pointer;user-select:none">
+      <span style="margin-right:6px">${hoursBarsCollapsed ? '▶' : '▼'}</span>Consumo por etapa (estimado vs. real)
+    </div>
+    <div id="hpBars" style="display:${hoursBarsCollapsed ? 'none' : 'block'}">
+      ${bars}
+      <div class="hp-legend"><span><span class="sw" style="background:#2563eb"></span>Horas estimadas</span><span><span class="sw" style="background:#16a34a;width:3px"></span>Real consumido</span></div>
+    </div>`;
 }
 
 function toggleHoursPanel() {
   const panel = document.getElementById('hoursPanel');
   panel.dataset.userToggled = '1';
   panel.style.display = (panel.style.display === 'none' || !panel.style.display) ? 'block' : 'none';
+}
+
+// Colapsar/expandir la sección de barras (mantiene visible el resumen)
+function toggleHoursBars() {
+  hoursBarsCollapsed = !hoursBarsCollapsed;
+  renderHoursPanel();
 }
 
 // Re-parsea las horas, las asocia a Epics y refresca el panel
