@@ -505,17 +505,20 @@ async function fetchItemsByIds(ids) {
   return raw;
 }
 
-// Wrapper: intenta la consulta jerárquica (recursiva desde Epics) y cae a la plana si falla.
+// Wrapper: combina la consulta jerárquica (descendientes de Epics, sin importar área/tope)
+// con la plana (todos los tipos del área, incl. Improvements). Une por id.
 async function fetchWorkItems(areaFilter = '') {
-  linkParents = {}; // reset: si cae al fallback plano, se usa System.Parent
-  try {
-    const raw = await fetchWorkItemsHierarchy(areaFilter);
-    if (raw && raw.length) return raw;
-    console.warn('Fetch jerárquico devolvió vacío, usando consulta plana.');
-  } catch (e) {
-    console.warn('Fetch jerárquico falló, usando consulta plana:', e);
-  }
-  return await fetchWorkItemsFlat(areaFilter);
+  linkParents = {}; // se puebla con la jerárquica; los ítems solo-planos usan System.Parent
+  let hierRaw = [], flatRaw = [];
+  try { hierRaw = await fetchWorkItemsHierarchy(areaFilter); }
+  catch (e) { console.warn('Fetch jerárquico falló:', e); }
+  try { flatRaw = await fetchWorkItemsFlat(areaFilter); }
+  catch (e) { console.warn('Fetch plano falló:', e); }
+  // Unir por id (la jerárquica pisa a la plana, mismos campos)
+  const byId = new Map();
+  for (const it of flatRaw) byId.set(it.id, it);
+  for (const it of hierRaw) byId.set(it.id, it);
+  return [...byId.values()];
 }
 
 // Consulta jerárquica: arranca en las Epics (con filtro de área del equipo) y baja
