@@ -107,6 +107,7 @@ a.ititle:hover { color: #2563eb; text-decoration: underline; }
 .sbadge { display: inline-flex; align-items: center; gap: 3px; padding: 2px 7px; border-radius: 10px; font-size: 10px; font-weight: 600; white-space: nowrap; }
 .s-done { background: #dcfce7; color: #15803d; }
 .s-active { background: #dbeafe; color: #1d4ed8; }
+.s-stage { background: #e0e7ff; color: #4338ca; }
 .s-new { background: #f3f4f6; color: #6b7280; }
 .s-removed { background: #fee2e2; color: #b91c1c; }
 .s-resolved { background: #fef3c7; color: #92400e; }
@@ -688,13 +689,14 @@ function processItems(raw, iters) {
     let progress = stateToProgress(f['System.State'] || '');
 
     const assignee = f['System.AssignedTo'];
+    const assigneeName = assignee?.displayName || '';
     return {
       id: item.id, title: f['System.Title'] || '(sin título)', type,
-      state: f['System.State'] || 'New',
+      state: overrideState(f['System.State'] || 'New', assigneeName),
       iterPath: f['System.IterationPath'] || '',
       parentId: linkParents[item.id] || f['System.Parent'] || null,
       startDate, endDate, progress, iter, hasExplicitDates,
-      assignee: assignee?.displayName || '',
+      assignee: assigneeName,
       priority: f['Microsoft.VSTS.Common.Priority'] || 0,
       children: [],
     };
@@ -869,9 +871,20 @@ function esc(s) {
   return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
+// Override de estado según asignado: New + Marquez Luis → Diseño Técnico;
+// New + (Garcia Joshua | Lazarte Matias) → Análisis.
+function overrideState(state, assignee) {
+  if ((state || '').trim().toLowerCase() !== 'new') return state;
+  const a = (assignee || '').toLowerCase();
+  if (a.includes('marquez') && a.includes('luis')) return 'Diseño Técnico';
+  if ((a.includes('garcia') && a.includes('joshua')) || (a.includes('lazarte') && a.includes('matias'))) return 'Análisis';
+  return state;
+}
+
 function statusCls(s) {
   const l = (s||'').toLowerCase();
   if (['done','closed','resolved','completed'].some(x => l.includes(x))) return 's-done';
+  if (['análisis','analisis','diseño','diseno'].some(x => l.includes(x))) return 's-stage';
   if (['active','in progress','committed','in-progress'].some(x => l.includes(x))) return 's-active';
   if (['removed'].some(x => l.includes(x))) return 's-removed';
   if (['resolved'].some(x => l.includes(x))) return 's-resolved';
