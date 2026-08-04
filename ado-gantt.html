@@ -906,7 +906,15 @@ function render() {
   const mount = document.getElementById('mount');
   DAY_W = cfg.dayW || 28;
 
-  const validIters = iterations.filter(i => i.startDate && i.endDate);
+  const validIters = iterations.filter(i => i.startDate && i.endDate)
+    .slice().sort((a, b) => a.startDate - b.startDate);
+  // Ancho efectivo de cada sprint: se estira hasta el inicio del siguiente para
+  // tapar el hueco del fin de semana (viernes→lunes). El último usa su ancho real.
+  function sprintSpanDays(i) {
+    const it = validIters[i], next = validIters[i + 1];
+    if (next && next.startDate > it.startDate) return doff(next.startDate) - doff(it.startDate);
+    return Math.round((it.endDate - it.startDate) / 86400000) + 1;
+  }
   if (!validIters.length) {
     mount.innerHTML = '<div class="err"><strong>Sin sprints</strong>No se encontraron iteraciones con fechas. Verificá el nombre del equipo en ⚙️ Config.</div>';
     return;
@@ -952,10 +960,10 @@ function render() {
   // Cada celda se posiciona usando el offset real en días desde tlStart,
   // igual que las barras → garantiza alineación perfecta incluyendo gaps entre sprints.
   let sprintsHtml = '';
-  for (const it of validIters) {
+  for (let i = 0; i < validIters.length; i++) {
+    const it = validIters[i];
     const left = px(doff(it.startDate));
-    const days = Math.round((it.endDate - it.startDate) / 86400000) + 1;
-    const w    = Math.max(px(days), 4);
+    const w    = Math.max(px(sprintSpanDays(i)), 4);
     const isCur  = today >= it.startDate && today <= it.endDate;
     const isPast = it.endDate < today;
     const cls = isCur ? 'current' : isPast ? 'past' : '';
@@ -970,8 +978,7 @@ function render() {
   for (let i = 0; i < validIters.length; i++) {
     const it = validIters[i];
     const left = px(doff(it.startDate));
-    const days = Math.round((it.endDate - it.startDate) / 86400000) + 1;
-    const w = px(days);
+    const w = px(sprintSpanDays(i));
     sprintBgHtml += `<div class="sprint-bg${i%2===1?' even':''}" style="left:${left}px;width:${w}px"></div>`;
     sprintBgHtml += `<div class="sprint-divider" style="left:${left}px"></div>`;
   }
