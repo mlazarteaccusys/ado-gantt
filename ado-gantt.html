@@ -49,6 +49,9 @@ body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Robo
 .btn.primary:hover { background: #1d4ed8; border-color: #1d4ed8; }
 .expand-btns { display: flex; gap: 4px; }
 .btn-sq { padding: 3px 9px; font-size: 15px; font-weight: 700; line-height: 1; min-width: 28px; }
+.axis-toggle { display: inline-flex; background: #f1f3f5; border: 1px solid #e2e4e9; border-radius: 8px; padding: 2px; gap: 2px; }
+.axis-opt { border: none; background: transparent; padding: 5px 12px; border-radius: 6px; font-size: 12px; font-weight: 600; color: #6b7280; cursor: pointer; transition: all .15s; }
+.axis-opt.active { background: #fff; color: #2563eb; box-shadow: 0 1px 2px rgba(16,24,40,.12); }
 .last-update { font-size: 11px; color: #aaa; white-space: nowrap; }
 /* ── Team dropdown ── */
 .team-select-wrap { display: flex; align-items: center; gap: 6px; }
@@ -268,6 +271,11 @@ a.ititle:hover { color: #2563eb; text-decoration: underline; }
     <button class="btn btn-sq" title="Colapsar un nivel" onclick="collapseOneLevel()">−</button>
   </div>
   <div class="sep"></div>
+  <div class="axis-toggle" id="axisToggle">
+    <button class="axis-opt active" data-axis="sprint" onclick="setTimeAxis('sprint')">Sprint</button>
+    <button class="axis-opt" data-axis="month" onclick="setTimeAxis('month')">Mes</button>
+  </div>
+  <div class="sep"></div>
   <div class="filters">
     <span class="filter-label">Mostrar:</span>
     <span class="chip on epic"    data-t="Epic"        onclick="toggleChip(this)">👑 Epics</span>
@@ -305,6 +313,7 @@ let collapsed = new Set();
 let activeTypes = new Set(['Epic','Feature','User Story','Technical Task','Task','Bug','Improvement']);
 let DAY_W = 28;
 let tlStart = null, tlDays = 0;
+let timeAxis = 'sprint';   // 'sprint' | 'month' — eje del encabezado del timeline
 
 // ─── Config ────────────────────────────────────────────────────────────────────
 function loadCfg() {
@@ -941,18 +950,25 @@ function render() {
   // Left panel width = name col + fixed cols
   const LW = totalLeftW();
 
-  // ── Months row ──────────────────────────────────────────────────────────────
-  let monthsHtml = '';
+  // ── Months (eje por mes: celdas absolutas + bandas de fondo) ────────────────
+  let monthCellsHtml = '', monthBgHtml = '';
   {
     let cur = new Date(tStart.getFullYear(), tStart.getMonth(), 1);
+    let mi = 0;
     while (cur <= tEnd) {
       const mStart = new Date(Math.max(cur, tStart));
       const mEnd   = new Date(Math.min(new Date(cur.getFullYear(), cur.getMonth()+1, 0), tEnd));
+      const left   = px(doff(mStart));
       const days   = Math.round((mEnd - mStart) / 86400000) + 1;
       const w      = px(days);
-      const lbl    = mStart.toLocaleString('es', { month:'long', year:'numeric' });
-      monthsHtml  += `<div class="month-cell" style="min-width:${w}px;width:${w}px">${lbl}</div>`;
+      const isCur  = today >= mStart && today <= mEnd;
+      const isPast = mEnd < today;
+      const cls    = isCur ? 'current' : isPast ? 'past' : '';
+      const lbl    = new Date(cur.getFullYear(), cur.getMonth(), 1).toLocaleString('es', { month:'long', year:'numeric' });
+      monthCellsHtml += `<div class="sprint-cell ${cls}" style="position:absolute;left:${left}px;width:${w}px" title="${esc(lbl)}">${esc(lbl)}</div>`;
+      monthBgHtml    += `<div class="sprint-bg${mi%2===1?' even':''}" style="left:${left}px;width:${w}px"></div><div class="sprint-divider" style="left:${left}px"></div>`;
       cur = new Date(cur.getFullYear(), cur.getMonth()+1, 1);
+      mi++;
     }
   }
 
@@ -1076,10 +1092,10 @@ function render() {
         </div>
         <div class="g-right" id="tlScroll">
           <div class="th" style="width:${totalW}px">
-            <div class="sprints-row">${sprintsHtml}</div>
+            <div class="sprints-row">${timeAxis === 'month' ? monthCellsHtml : sprintsHtml}</div>
           </div>
           <div style="position:relative;width:${totalW}px">
-            ${sprintBgHtml}
+            ${timeAxis === 'month' ? monthBgHtml : sprintBgHtml}
             ${todayLine}
             <div id="rightBody">${rightRows}</div>
           </div>
@@ -1344,6 +1360,14 @@ function toggleHoursPanel() {
   const panel = document.getElementById('hoursPanel');
   panel.dataset.userToggled = '1';
   panel.style.display = (panel.style.display === 'none' || !panel.style.display) ? 'block' : 'none';
+}
+
+// Cambia el eje del encabezado del timeline (por sprint o por mes)
+function setTimeAxis(mode) {
+  if (timeAxis === mode) return;
+  timeAxis = mode;
+  document.querySelectorAll('#axisToggle .axis-opt').forEach(b => b.classList.toggle('active', b.dataset.axis === mode));
+  rerenderKeepScroll();
 }
 
 // Colapsar/expandir la sección de barras (mantiene visible el resumen)
