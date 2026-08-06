@@ -947,7 +947,8 @@ function pfCls(t) {
 // ─── Main render ───────────────────────────────────────────────────────────────
 function render() {
   const mount = document.getElementById('mount');
-  DAY_W = cfg.dayW || 28;
+  // En modo Mes se comprime el ancho de día para que entren y se comparen más meses
+  DAY_W = timeAxis === 'month' ? 9 : (cfg.dayW || 28);
 
   const validIters = iterations.filter(i => i.startDate && i.endDate)
     .slice().sort((a, b) => a.startDate - b.startDate);
