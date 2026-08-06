@@ -228,6 +228,8 @@ a.ititle:hover { color: #2563eb; text-decoration: underline; }
 .hp-bar { position: relative; height: 22px; background: #e5e7eb; border-radius: 5px; overflow: hidden; }
 .hp-bar-est { position: absolute; left: 0; top: 0; height: 100%; background: #2563eb; border-radius: 5px 0 0 5px; }
 .hp-bar-real { position: absolute; top: -2px; bottom: -2px; width: 3px; }
+.hp-row-counts { font-size: 11px; color: #6b7280; margin-top: 5px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.hp-rework { background: #fef2f2; color: #b91c1c; font-weight: 700; padding: 1px 8px; border-radius: 999px; }
 .hp-legend { font-size: 11px; color: #9ca3af; display: flex; gap: 16px; align-items: center; margin-top: 6px; }
 .hp-legend .sw { display: inline-block; width: 12px; height: 10px; border-radius: 2px; margin-right: 4px; vertical-align: middle; }
 /* Inline en filas de Epic */
@@ -1375,8 +1377,21 @@ function matchHoursToEpics() {
       if (score > bestScore) { bestScore = score; best = ep; }
     }
     e.epicId = bestScore >= 1 ? best.id : null;
+    e.epicNode = bestScore >= 1 ? best : null;
     if (e.epicId) hoursByEpic[e.epicId] = e;
   }
+}
+
+// Cuenta descendientes de una Epic por tipo (para leer si el desvío es por retrabajo)
+function countDescByType(node) {
+  const c = { 'User Story': 0, 'Technical Task': 0, 'Task': 0, 'Improvement': 0, 'Bug': 0 };
+  (function walk(n) {
+    for (const ch of (n.children || [])) {
+      if (c[ch.type] !== undefined) c[ch.type]++;
+      walk(ch);
+    }
+  })(node || {});
+  return c;
 }
 
 function hoursClass(real, est) {
@@ -1412,6 +1427,17 @@ function renderHoursPanel() {
     const cls = hoursClass(e.real, e.est);
     const pct = e.est ? Math.round(e.real / e.est * 100) : 0;
     const realColor = cls === 'bad' ? '#dc2626' : (cls === 'warn' ? '#d97706' : '#16a34a');
+    let countsHtml = '';
+    if (e.epicNode) {
+      const c = countDescByType(e.epicNode);
+      const rework = c['Improvement'] + c['Bug'];
+      const parts = [`📗 ${c['User Story']} US`];
+      if (c['Technical Task']) parts.push(`⚙️ ${c['Technical Task']} TT`);
+      if (c['Task']) parts.push(`✅ ${c['Task']} Tasks`);
+      parts.push(`💡 ${c['Improvement']} Improv`);
+      parts.push(`🐛 ${c['Bug']} Bugs`);
+      countsHtml = `<div class="hp-row-counts">${parts.join(' · ')}${rework ? `<span class="hp-rework" title="Improvements + Bugs = trabajo no planificado (retrabajo)">↻ retrabajo ${rework}</span>` : ''}</div>`;
+    }
     bars += `<div class="hp-row">
       <div class="hp-row-head">
         <span class="hp-row-name">${esc(e.name)}</span>
@@ -1421,6 +1447,7 @@ function renderHoursPanel() {
         <div class="hp-bar-est" style="width:${e.est / max * 100}%"></div>
         <div class="hp-bar-real" style="left:calc(${e.real / max * 100}% - 1px);background:${realColor}"></div>
       </div>
+      ${countsHtml}
     </div>`;
   }
 
