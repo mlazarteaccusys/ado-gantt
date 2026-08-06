@@ -52,6 +52,21 @@ body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Robo
 .axis-toggle { display: inline-flex; background: #f1f3f5; border: 1px solid #e2e4e9; border-radius: 8px; padding: 2px; gap: 2px; }
 .axis-opt { border: none; background: transparent; padding: 5px 12px; border-radius: 6px; font-size: 12px; font-weight: 600; color: #6b7280; cursor: pointer; transition: all .15s; }
 .axis-opt.active { background: #fff; color: #2563eb; box-shadow: 0 1px 2px rgba(16,24,40,.12); }
+/* Menú de filtros */
+.filter-menu { position: relative; display: inline-flex; }
+#filterBtn { display: inline-flex; align-items: center; gap: 6px; }
+#filterBtn.filtered { border-color: #2563eb; color: #2563eb; }
+#filterBtn .caret { opacity: .55; font-size: 10px; }
+.filter-badge { background: #eef2ff; color: #4338ca; font-size: 10px; font-weight: 700; padding: 1px 7px; border-radius: 999px; }
+.filter-pop { position: absolute; top: calc(100% + 6px); left: 0; z-index: 150; min-width: 200px; background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; box-shadow: 0 12px 30px rgba(16,24,40,.14); padding: 6px; display: none; }
+.filter-pop.open { display: block; }
+.filter-pop-head { font-size: 10px; font-weight: 700; color: #9ca3af; text-transform: uppercase; letter-spacing: .5px; padding: 6px 8px 4px; }
+.filter-item { display: flex; align-items: center; gap: 9px; padding: 7px 8px; border-radius: 8px; cursor: pointer; font-size: 13px; color: #374151; }
+.filter-item:hover { background: #f5f6f8; }
+.filter-item input { width: 15px; height: 15px; accent-color: #2563eb; cursor: pointer; }
+.filter-pop-foot { display: flex; gap: 6px; padding: 6px 4px 2px; border-top: 1px solid #f0f1f3; margin-top: 4px; }
+.filter-pop-foot button { flex: 1; border: 1px solid #e2e4e9; background: #fff; border-radius: 8px; padding: 6px; font-size: 12px; font-weight: 600; color: #374151; cursor: pointer; }
+.filter-pop-foot button:hover { background: #f5f6f8; }
 .last-update { font-size: 11px; color: #aaa; white-space: nowrap; }
 /* ── Team dropdown ── */
 .team-select-wrap { display: flex; align-items: center; gap: 6px; }
@@ -173,7 +188,20 @@ a.ititle:hover { color: #2563eb; text-decoration: underline; }
 .gtt { position: fixed; background: #1e293b; color: white; font-size: 12px; padding: 8px 12px; border-radius: 6px; pointer-events: none; z-index: 999; max-width: 280px; line-height: 1.5; display: none; box-shadow: 0 4px 12px rgba(0,0,0,.3); }
 
 /* ── Panel de Horas ── */
-#hoursPanel { padding: 16px 20px; background: #fafbfc; border-bottom: 1px solid #e0e0e0; }
+#hoursPanel { padding: 8px 20px; background: #fafbfc; border-bottom: 1px solid #e8eaed; }
+/* Strip resumen (colapsado por defecto) */
+.hp-strip { display: flex; align-items: center; justify-content: space-between; gap: 12px; cursor: pointer; padding: 5px 2px; }
+.hp-strip:hover .hp-strip-toggle { color: #2563eb; }
+.hp-strip-figs { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: #4b5563; flex-wrap: wrap; }
+.hp-strip-title { font-weight: 700; color: #111827; margin-right: 2px; }
+.hp-strip-figs b { font-weight: 700; color: #111827; }
+.hp-strip-figs b.warn { color: #b45309; }
+.hp-strip-figs b.bad { color: #b91c1c; }
+.hp-strip-figs b.ok { color: #15803d; }
+.hp-dot { color: #d1d5db; }
+.hp-strip-toggle { font-size: 12px; font-weight: 600; color: #6b7280; white-space: nowrap; display: inline-flex; align-items: center; gap: 4px; }
+.hp-strip-toggle .caret { font-size: 9px; }
+.hp-detail { padding-top: 14px; }
 .hp-cards { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 18px; }
 .hp-card { flex: 1; min-width: 160px; background: white; border: 1px solid #e8eaed; border-radius: 12px; padding: 15px 17px; box-shadow: 0 1px 2px rgba(16,24,40,.04); }
 .hp-card.warn { background: #fefce8; border-color: #fde68a; }
@@ -276,19 +304,25 @@ a.ititle:hover { color: #2563eb; text-decoration: underline; }
     <button class="axis-opt" data-axis="month" onclick="setTimeAxis('month')">Mes</button>
   </div>
   <div class="sep"></div>
-  <div class="filters">
-    <span class="filter-label">Mostrar:</span>
-    <span class="chip on epic"    data-t="Epic"        onclick="toggleChip(this)">👑 Epics</span>
-    <span class="chip on feature" data-t="Feature"     onclick="toggleChip(this)">🔷 Features</span>
-    <span class="chip on story"      data-t="User Story"      onclick="toggleChip(this)">📗 Stories</span>
-    <span class="chip on techTask"   data-t="Technical Task"  onclick="toggleChip(this)">⚙️ Tech Tasks</span>
-    <span class="chip on task"        data-t="Task"         onclick="toggleChip(this)">✅ Tasks</span>
-    <span class="chip on improvement" data-t="Improvement"  onclick="toggleChip(this)">💡 Improvements</span>
-    <span class="chip on bug"     data-t="Bug"          onclick="toggleChip(this)">🐛 Bugs</span>
+  <div class="filter-menu">
+    <button class="btn" id="filterBtn" onclick="toggleFilterMenu(event)">Filtros<span class="filter-badge" id="filterBadge">Todos</span><span class="caret">▾</span></button>
+    <div class="filter-pop" id="filterPop">
+      <div class="filter-pop-head">Mostrar tipos</div>
+      <label class="filter-item"><input type="checkbox" data-t="Epic" onchange="setFilterType('Epic',this.checked)"><span>👑 Epics</span></label>
+      <label class="filter-item"><input type="checkbox" data-t="Feature" onchange="setFilterType('Feature',this.checked)"><span>🔷 Features</span></label>
+      <label class="filter-item"><input type="checkbox" data-t="User Story" onchange="setFilterType('User Story',this.checked)"><span>📗 Stories</span></label>
+      <label class="filter-item"><input type="checkbox" data-t="Technical Task" onchange="setFilterType('Technical Task',this.checked)"><span>⚙️ Tech Tasks</span></label>
+      <label class="filter-item"><input type="checkbox" data-t="Task" onchange="setFilterType('Task',this.checked)"><span>✅ Tasks</span></label>
+      <label class="filter-item"><input type="checkbox" data-t="Improvement" onchange="setFilterType('Improvement',this.checked)"><span>💡 Improvements</span></label>
+      <label class="filter-item"><input type="checkbox" data-t="Bug" onchange="setFilterType('Bug',this.checked)"><span>🐛 Bugs</span></label>
+      <div class="filter-pop-foot">
+        <button onclick="setAllFilters(true)">Todos</button>
+        <button onclick="setAllFilters(false)">Ninguno</button>
+      </div>
+    </div>
   </div>
   <div class="spacer"></div>
   <span class="last-update" id="lastUpdate"></span>
-  <button class="btn" id="hoursBtn" onclick="toggleHoursPanel()" style="display:none">📊 Horas</button>
   <button class="btn" onclick="showConfig()">⚙️ Config</button>
   <button class="btn primary" onclick="loadData()">↻ Actualizar</button>
 </div>
@@ -1193,12 +1227,42 @@ function toggleCol(id) {
   }
 }
 
-function toggleChip(el) {
-  const t = el.dataset.t;
-  if (activeTypes.has(t)) { activeTypes.delete(t); el.classList.remove('on'); }
-  else { activeTypes.add(t); el.classList.add('on'); }
+// ─── Menú de filtros por tipo ────────────────────────────────────────────────
+const ALL_TYPES = ['Epic','Feature','User Story','Technical Task','Task','Bug','Improvement'];
+
+function toggleFilterMenu(e) {
+  if (e) e.stopPropagation();
+  const pop = document.getElementById('filterPop');
+  pop.classList.toggle('open');
+}
+function setFilterType(t, on) {
+  if (on) activeTypes.add(t); else activeTypes.delete(t);
+  syncFilterMenu();
   render();
 }
+function setAllFilters(on) {
+  activeTypes = on ? new Set(ALL_TYPES) : new Set();
+  syncFilterMenu();
+  render();
+}
+// Refleja activeTypes en los checkboxes y el badge del botón
+function syncFilterMenu() {
+  document.querySelectorAll('#filterPop input[type=checkbox]').forEach(cb => {
+    cb.checked = activeTypes.has(cb.dataset.t);
+  });
+  const badge = document.getElementById('filterBadge');
+  if (badge) {
+    const n = ALL_TYPES.filter(t => activeTypes.has(t)).length;
+    badge.textContent = n === ALL_TYPES.length ? 'Todos' : (n === 0 ? 'Ninguno' : n);
+    document.getElementById('filterBtn').classList.toggle('filtered', n !== ALL_TYPES.length);
+  }
+}
+// Cerrar el popover al clickear afuera
+document.addEventListener('click', e => {
+  const menu = document.querySelector('.filter-menu');
+  const pop = document.getElementById('filterPop');
+  if (pop && pop.classList.contains('open') && menu && !menu.contains(e.target)) pop.classList.remove('open');
+});
 
 // Expandir / colapsar todos los niveles (como en Azure DevOps)
 function rerenderKeepScroll() {
@@ -1240,7 +1304,7 @@ function collapseOneLevel() {
 // ─── Horas por etapa (reporte semanal) ───────────────────────────────────────
 let hoursData = [];       // [{extId, name, est, real, epicId}]
 let hoursByEpic = {};     // {epicId: entry}
-let hoursBarsCollapsed = false;  // estado del colapso de la sección de barras
+let hoursDetailOpen = false;  // detalle de horas (tarjetas + barras) plegado por defecto
 
 function parseNum(s) { return parseFloat(String(s).replace(/\./g, '').replace(',', '.')) || 0; }
 
@@ -1304,10 +1368,8 @@ function fmtHrs(n) { return (Math.round(n * 10) / 10).toLocaleString('es-AR'); }
 
 function renderHoursPanel() {
   const panel = document.getElementById('hoursPanel');
-  const btn = document.getElementById('hoursBtn');
-  if (!hoursData.length) { panel.style.display = 'none'; btn.style.display = 'none'; return; }
-  btn.style.display = '';
-  if (!panel.dataset.userToggled) panel.style.display = 'block';
+  if (!hoursData.length) { panel.style.display = 'none'; return; }
+  panel.style.display = 'block';
 
   const totEst = hoursData.reduce((a, e) => a + e.est, 0);
   const totReal = hoursData.reduce((a, e) => a + e.real, 0);
@@ -1340,26 +1402,35 @@ function renderHoursPanel() {
     </div>`;
   }
 
+  const desvPct = totEst ? Math.round(desvio / totEst * 1000) / 10 : 0;
   panel.innerHTML = `
-    <div class="hp-cards">
-      <div class="hp-card"><div class="lbl">Horas estimadas</div><div class="val">${fmtHrs(totEst)}</div><div class="sub">Línea base de ${hoursData.length} etapas</div></div>
-      <div class="hp-card"><div class="lbl">Horas consumidas</div><div class="val">${fmtHrs(totReal)}</div><div class="sub">${pctTot}% de la línea base</div></div>
-      <div class="hp-card ${desvClass}"><div class="lbl">Desvío total</div><div class="val">${desvio >= 0 ? '+' : ''}${fmtHrs(desvio)} hs</div><div class="sub">${desvio >= 0 ? '+' : ''}${totEst ? Math.round(desvio / totEst * 1000) / 10 : 0}% sobre lo estimado</div></div>
-      <div class="hp-card bad"><div class="lbl">Concentración del desvío</div><div class="val">${esc(concShort)}</div><div class="sub">${concD >= 0 ? '+' : ''}${fmtHrs(concD)} hs (${concPct}% de su base)</div></div>
+    <div class="hp-strip" onclick="toggleHoursDetail()" title="Ver detalle de horas">
+      <div class="hp-strip-figs">
+        <span class="hp-strip-title">Horas</span>
+        <span>Estimadas <b>${fmtHrs(totEst)}</b></span>
+        <span class="hp-dot">·</span>
+        <span>Consumidas <b>${fmtHrs(totReal)}</b></span>
+        <span class="hp-dot">·</span>
+        <span>Desvío <b class="${desvClass}">${desvio >= 0 ? '+' : ''}${fmtHrs(desvio)} hs (${desvPct >= 0 ? '+' : ''}${desvPct}%)</b></span>
+      </div>
+      <span class="hp-strip-toggle">${hoursDetailOpen ? 'Ocultar' : 'Ver detalle'} <span class="caret">${hoursDetailOpen ? '▲' : '▼'}</span></span>
     </div>
-    <div class="hp-title" onclick="toggleHoursBars()" style="cursor:pointer;user-select:none">
-      <span style="margin-right:6px">${hoursBarsCollapsed ? '▶' : '▼'}</span>Consumo por etapa (estimado vs. real)
-    </div>
-    <div id="hpBars" style="display:${hoursBarsCollapsed ? 'none' : 'block'}">
+    <div class="hp-detail" style="display:${hoursDetailOpen ? 'block' : 'none'}">
+      <div class="hp-cards">
+        <div class="hp-card"><div class="lbl">Horas estimadas</div><div class="val">${fmtHrs(totEst)}</div><div class="sub">Línea base de ${hoursData.length} etapas</div></div>
+        <div class="hp-card"><div class="lbl">Horas consumidas</div><div class="val">${fmtHrs(totReal)}</div><div class="sub">${pctTot}% de la línea base</div></div>
+        <div class="hp-card ${desvClass}"><div class="lbl">Desvío total</div><div class="val">${desvio >= 0 ? '+' : ''}${fmtHrs(desvio)} hs</div><div class="sub">${desvio >= 0 ? '+' : ''}${desvPct}% sobre lo estimado</div></div>
+        <div class="hp-card bad"><div class="lbl">Concentración del desvío</div><div class="val">${esc(concShort)}</div><div class="sub">${concD >= 0 ? '+' : ''}${fmtHrs(concD)} hs (${concPct}% de su base)</div></div>
+      </div>
+      <div class="hp-title">Consumo por etapa (estimado vs. real)</div>
       ${bars}
       <div class="hp-legend"><span><span class="sw" style="background:#2563eb"></span>Horas estimadas</span><span><span class="sw" style="background:#16a34a;width:3px"></span>Real consumido</span></div>
     </div>`;
 }
 
-function toggleHoursPanel() {
-  const panel = document.getElementById('hoursPanel');
-  panel.dataset.userToggled = '1';
-  panel.style.display = (panel.style.display === 'none' || !panel.style.display) ? 'block' : 'none';
+function toggleHoursDetail() {
+  hoursDetailOpen = !hoursDetailOpen;
+  renderHoursPanel();
 }
 
 // Cambia el eje del encabezado del timeline (por sprint o por mes)
@@ -1368,12 +1439,6 @@ function setTimeAxis(mode) {
   timeAxis = mode;
   document.querySelectorAll('#axisToggle .axis-opt').forEach(b => b.classList.toggle('active', b.dataset.axis === mode));
   rerenderKeepScroll();
-}
-
-// Colapsar/expandir la sección de barras (mantiene visible el resumen)
-function toggleHoursBars() {
-  hoursBarsCollapsed = !hoursBarsCollapsed;
-  renderHoursPanel();
 }
 
 // Re-parsea las horas, las asocia a Epics y refresca el panel
@@ -1432,6 +1497,7 @@ async function loadData() {
 }
 
 // ─── Init ─────────────────────────────────────────────────────────────────────
+syncFilterMenu();
 loadCfg();
 </script>
 </body>
