@@ -1416,12 +1416,6 @@ function renderHoursPanel() {
       <span class="hp-strip-toggle">${hoursDetailOpen ? 'Ocultar' : 'Ver detalle'} <span class="caret">${hoursDetailOpen ? '▲' : '▼'}</span></span>
     </div>
     <div class="hp-detail" style="display:${hoursDetailOpen ? 'block' : 'none'}">
-      <div class="hp-cards">
-        <div class="hp-card"><div class="lbl">Horas estimadas</div><div class="val">${fmtHrs(totEst)}</div><div class="sub">Línea base de ${hoursData.length} etapas</div></div>
-        <div class="hp-card"><div class="lbl">Horas consumidas</div><div class="val">${fmtHrs(totReal)}</div><div class="sub">${pctTot}% de la línea base</div></div>
-        <div class="hp-card ${desvClass}"><div class="lbl">Desvío total</div><div class="val">${desvio >= 0 ? '+' : ''}${fmtHrs(desvio)} hs</div><div class="sub">${desvio >= 0 ? '+' : ''}${desvPct}% sobre lo estimado</div></div>
-        <div class="hp-card bad"><div class="lbl">Concentración del desvío</div><div class="val">${esc(concShort)}</div><div class="sub">${concD >= 0 ? '+' : ''}${fmtHrs(concD)} hs (${concPct}% de su base)</div></div>
-      </div>
       <div class="hp-title">Consumo por etapa (estimado vs. real)</div>
       ${bars}
       <div class="hp-legend"><span><span class="sw" style="background:#2563eb"></span>Horas estimadas</span><span><span class="sw" style="background:#16a34a;width:3px"></span>Real consumido</span></div>
