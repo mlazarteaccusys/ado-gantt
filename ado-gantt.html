@@ -52,6 +52,12 @@ body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Robo
 .axis-toggle { display: inline-flex; background: #f1f3f5; border: 1px solid #e2e4e9; border-radius: 8px; padding: 2px; gap: 2px; }
 .axis-opt { border: none; background: transparent; padding: 5px 12px; border-radius: 6px; font-size: 12px; font-weight: 600; color: #6b7280; cursor: pointer; transition: all .15s; }
 .axis-opt.active { background: #fff; color: #2563eb; box-shadow: 0 1px 2px rgba(16,24,40,.12); }
+/* Zoom del timeline */
+.zoom-ctl { display: inline-flex; align-items: center; gap: 4px; }
+.zoom-btn { width: 26px; height: 28px; border: 1px solid #e2e4e9; background: #fff; border-radius: 8px; font-size: 15px; font-weight: 700; color: #374151; cursor: pointer; line-height: 1; transition: all .15s; }
+.zoom-btn:hover { background: #f6f7f9; border-color: #d1d5db; }
+#zoomSel { height: 28px; border: 1px solid #e2e4e9; border-radius: 8px; background: #fff; font-size: 12px; font-weight: 600; color: #374151; padding: 0 6px; cursor: pointer; }
+#zoomSel:focus { outline: none; border-color: #2563eb; }
 /* Menú de filtros */
 .filter-menu { position: relative; display: inline-flex; }
 #filterBtn { display: inline-flex; align-items: center; gap: 6px; }
@@ -304,6 +310,19 @@ a.ititle:hover { color: #2563eb; text-decoration: underline; }
     <button class="axis-opt" data-axis="month" onclick="setTimeAxis('month')">Mes</button>
   </div>
   <div class="sep"></div>
+  <div class="zoom-ctl" title="Zoom del timeline">
+    <button class="zoom-btn" onclick="zoomStep(-1)" title="Alejar">−</button>
+    <select id="zoomSel" onchange="setZoom(this.value)">
+      <option value="50">50%</option>
+      <option value="75">75%</option>
+      <option value="100" selected>100%</option>
+      <option value="125">125%</option>
+      <option value="150">150%</option>
+      <option value="200">200%</option>
+    </select>
+    <button class="zoom-btn" onclick="zoomStep(1)" title="Acercar">+</button>
+  </div>
+  <div class="sep"></div>
   <div class="filter-menu">
     <button class="btn" id="filterBtn" onclick="toggleFilterMenu(event)">Filtros<span class="filter-badge" id="filterBadge">Todos</span><span class="caret">▾</span></button>
     <div class="filter-pop" id="filterPop">
@@ -348,6 +367,7 @@ let activeTypes = new Set(['Epic','Feature','User Story','Technical Task','Task'
 let DAY_W = 28;
 let tlStart = null, tlDays = 0;
 let timeAxis = 'sprint';   // 'sprint' | 'month' — eje del encabezado del timeline
+let zoomPct = 100;         // zoom horizontal del timeline (%)
 
 // ─── Config ────────────────────────────────────────────────────────────────────
 function loadCfg() {
@@ -947,8 +967,9 @@ function pfCls(t) {
 // ─── Main render ───────────────────────────────────────────────────────────────
 function render() {
   const mount = document.getElementById('mount');
-  // En modo Mes se comprime el ancho de día para que entren y se comparen más meses
-  DAY_W = timeAxis === 'month' ? 9 : (cfg.dayW || 28);
+  // Ancho de día: base según el eje (Mes más compacto), escalado por el zoom (%)
+  const baseDayW = timeAxis === 'month' ? 10 : (cfg.dayW || 28);
+  DAY_W = Math.max(2, Math.round(baseDayW * zoomPct / 100));
 
   const validIters = iterations.filter(i => i.startDate && i.endDate)
     .slice().sort((a, b) => a.startDate - b.startDate);
@@ -1426,6 +1447,22 @@ function renderHoursPanel() {
 function toggleHoursDetail() {
   hoursDetailOpen = !hoursDetailOpen;
   renderHoursPanel();
+}
+
+// ─── Zoom del timeline ───────────────────────────────────────────────────────
+const ZOOM_LEVELS = [50, 75, 100, 125, 150, 200];
+function setZoom(v) {
+  zoomPct = parseInt(v) || 100;
+  const sel = document.getElementById('zoomSel');
+  if (sel && sel.value != String(zoomPct)) sel.value = String(zoomPct);
+  rerenderKeepScroll();
+}
+function zoomStep(dir) {
+  // Movés al preset anterior/siguiente respecto del zoom actual
+  let idx = ZOOM_LEVELS.indexOf(zoomPct);
+  if (idx === -1) idx = ZOOM_LEVELS.findIndex(z => z >= zoomPct);
+  idx = Math.max(0, Math.min(ZOOM_LEVELS.length - 1, idx + dir));
+  setZoom(ZOOM_LEVELS[idx]);
 }
 
 // Cambia el eje del encabezado del timeline (por sprint o por mes)
