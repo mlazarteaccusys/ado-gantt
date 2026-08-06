@@ -1433,7 +1433,6 @@ function renderHoursPanel() {
       const rework = c['Improvement'] + c['Bug'];
       const parts = [`📗 ${c['User Story']} US`];
       if (c['Technical Task']) parts.push(`⚙️ ${c['Technical Task']} TT`);
-      if (c['Task']) parts.push(`✅ ${c['Task']} Tasks`);
       parts.push(`💡 ${c['Improvement']} Improv`);
       parts.push(`🐛 ${c['Bug']} Bugs`);
       countsHtml = `<div class="hp-row-counts">${parts.join(' · ')}${rework ? `<span class="hp-rework" title="Improvements + Bugs = trabajo no planificado (retrabajo)">↻ retrabajo ${rework}</span>` : ''}</div>`;
