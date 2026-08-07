@@ -345,6 +345,17 @@ a.ititle:hover { color: #2563eb; text-decoration: underline; }
       </div>
     </div>
   </div>
+  <div class="filter-menu">
+    <button class="btn" id="stateBtn" onclick="toggleStateMenu(event)">Estado<span class="filter-badge" id="stateBadge">Todos</span><span class="caret">▾</span></button>
+    <div class="filter-pop" id="statePop">
+      <div class="filter-pop-head">Mostrar estados</div>
+      <div id="stateItems"></div>
+      <div class="filter-pop-foot">
+        <button onclick="setAllStates(true)">Todos</button>
+        <button onclick="setAllStates(false)">Ninguno</button>
+      </div>
+    </div>
+  </div>
   <div class="spacer"></div>
   <span class="last-update" id="lastUpdate"></span>
   <button class="btn" onclick="showConfig()">⚙️ Config</button>
@@ -503,6 +514,7 @@ async function onTeamChange(teamName) {
     workItems = processItems(raw, iters);
     buildFullTree();
     refreshHours();
+    buildStateMenu();
     const ts = new Date().toLocaleTimeString('es', { hour:'2-digit', minute:'2-digit' });
     document.getElementById('lastUpdate').textContent = `↻ ${ts} · ${workItems.length} items · ${iters.length} sprints`;
     render();
@@ -935,7 +947,7 @@ function businessDaysBetween(from, to) {
 function flatten(nodes, depth = 0) {
   const out = [];
   for (const n of nodes) {
-    const show = activeTypes.has(n.type);
+    const show = activeTypes.has(n.type) && stateVisible(n);
     // Contar hijos visibles (para saber si mostrar botón de colapsar)
     const hasVisibleKids = n.children.length > 0;
     if (show) {
@@ -1330,12 +1342,63 @@ function syncFilterMenu() {
     document.getElementById('filterBtn').classList.toggle('filtered', n !== ALL_TYPES.length);
   }
 }
-// Cerrar el popover al clickear afuera
+// Cerrar los popovers al clickear afuera
 document.addEventListener('click', e => {
-  const menu = document.querySelector('.filter-menu');
-  const pop = document.getElementById('filterPop');
-  if (pop && pop.classList.contains('open') && menu && !menu.contains(e.target)) pop.classList.remove('open');
+  document.querySelectorAll('.filter-menu').forEach(menu => {
+    const pop = menu.querySelector('.filter-pop');
+    if (pop && pop.classList.contains('open') && !menu.contains(e.target)) pop.classList.remove('open');
+  });
 });
+
+// ─── Filtro por estado (dinámico, según los estados presentes) ───────────────
+let activeStates = new Set();   // estados activos
+let statesKnown = false;        // ya se inicializó con los datos
+let allStatesList = [];         // estados presentes (orden alfabético)
+let priorStates = new Set();    // para preservar selección entre recargas
+
+function nodeDisplayState(n) { return n.type === 'Epic' ? epicDisplayState(n) : n.state; }
+function stateVisible(n) { return !statesKnown || activeStates.has(nodeDisplayState(n)); }
+
+function toggleStateMenu(e) {
+  if (e) e.stopPropagation();
+  document.getElementById('statePop').classList.toggle('open');
+}
+function setStateFilter(s, on) {
+  if (on) activeStates.add(s); else activeStates.delete(s);
+  syncStateBadge();
+  render();
+}
+function setAllStates(on) {
+  activeStates = on ? new Set(allStatesList) : new Set();
+  buildStateMenu(); // re-render checkboxes
+  render();
+}
+function syncStateBadge() {
+  const badge = document.getElementById('stateBadge');
+  if (!badge) return;
+  const n = allStatesList.filter(s => activeStates.has(s)).length;
+  badge.textContent = n === allStatesList.length ? 'Todos' : (n === 0 ? 'Ninguno' : n);
+  document.getElementById('stateBtn').classList.toggle('filtered', n !== allStatesList.length);
+}
+// Reconstruye el menú de estados desde el árbol actual
+function buildStateMenu() {
+  const present = new Set();
+  (function walk(nodes) { for (const n of (nodes || [])) { const s = nodeDisplayState(n); if (s) present.add(s); walk(n.children); } })(fullTree);
+  allStatesList = [...present].sort((a, b) => a.localeCompare(b, 'es'));
+  if (!statesKnown) { activeStates = new Set(allStatesList); statesKnown = true; }
+  else {
+    for (const s of allStatesList) if (!priorStates.has(s)) activeStates.add(s); // nuevos entran activos
+    for (const s of [...activeStates]) if (!present.has(s)) activeStates.delete(s); // se van los que no están
+  }
+  priorStates = present;
+  const cont = document.getElementById('stateItems');
+  if (cont) {
+    cont.innerHTML = allStatesList.length
+      ? allStatesList.map(s => `<label class="filter-item"><input type="checkbox" ${activeStates.has(s) ? 'checked' : ''} onchange="setStateFilter('${s.replace(/'/g, "\\'")}', this.checked)"><span class="sbadge ${statusCls(s)}" style="pointer-events:none">${esc(s)}</span></label>`).join('')
+      : '<div style="padding:8px 10px;color:#9ca3af;font-size:12px">Sin datos</div>';
+  }
+  syncStateBadge();
+}
 
 // Expandir / colapsar todos los niveles (como en Azure DevOps)
 function rerenderKeepScroll() {
@@ -1609,6 +1672,7 @@ async function loadData() {
     workItems  = processItems(raw, iters);
     buildFullTree();
     refreshHours();
+    buildStateMenu();
 
     // Populate team dropdown
     populateTeamDropdown();
