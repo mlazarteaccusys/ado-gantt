@@ -85,22 +85,25 @@ body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Robo
 .page { padding: 16px; }
 
 /* ── Gantt card ── */
-.gantt-card { background: white; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,.08); overflow: hidden; }
+.gantt-card { background: white; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,.08); }
 
 /* ── Gantt layout ── */
+.gantt-head { display: flex; position: sticky; top: var(--content-top, 54px); z-index: 15; background: #f7f8fa; border-radius: 8px 8px 0 0; }
+.gh-left { flex-shrink: 0; border-right: 2px solid #e0e0e0; }
+.gh-right { flex: 1; overflow: hidden; }
 .gantt-inner { display: flex; }
-.g-left { flex-shrink: 0; border-right: 2px solid #e0e0e0; overflow: hidden; }
+.g-left { flex-shrink: 0; border-right: 2px solid #e0e0e0; overflow: visible; }
 .g-right { flex: 1; overflow-x: auto; overflow-y: hidden; position: relative; }
 
 /* ── Left header ── */
 :root { --name-col: 220px; --estado-col: 95px; --horas-col: 110px; --prog-col: 72px; --periodo-col: 145px; }
-.lh { display: grid; grid-template-columns: var(--name-col) var(--estado-col) var(--horas-col) var(--prog-col) var(--periodo-col); background: #f7f8fa; border-bottom: 2px solid #e0e0e0; height: 65px; }
+.lh { display: grid; grid-template-columns: var(--name-col) var(--estado-col) var(--horas-col) var(--prog-col) var(--periodo-col); background: #f7f8fa; border-bottom: 2px solid #e0e0e0; height: 65px; border-radius: 8px 0 0 0; }
 .lh-cell { padding: 0 10px; display: flex; align-items: center; font-size: 11px; font-weight: 700; color: #666; text-transform: uppercase; letter-spacing: 0.4px; border-right: 1px solid #e8e8e8; position: relative; }
 .col-resize { position: absolute; right: 0; top: 0; bottom: 0; width: 6px; cursor: col-resize; background: transparent; z-index: 10; }
 .col-resize:hover, .col-resize.dragging { background: #2563eb; opacity: 0.5; }
 
 /* ── Timeline header ── */
-.th { background: #f7f8fa; border-bottom: 2px solid #e0e0e0; position: sticky; top: 0; z-index: 10; }
+.th { background: #f7f8fa; border-bottom: 2px solid #e0e0e0; border-radius: 0 8px 0 0; }
 .months-row { display: flex; border-bottom: 1px solid #e0e0e0; height: 30px; }
 .month-cell { border-right: 1px solid #ddd; padding: 0 10px; display: flex; align-items: center; font-weight: 700; font-size: 12px; color: #333; white-space: nowrap; overflow: hidden; flex-shrink: 0; }
 .sprints-row { position: relative; height: 65px; background: #f0f1f3; border-bottom: 1px solid #e0e0e0; }
@@ -1198,8 +1201,9 @@ function render() {
 
   mount.innerHTML = `
     <div class="gantt-card">
-      <div class="gantt-inner">
-        <div class="g-left" style="width:${LW}px">
+      <!-- Fila de encabezado completa: se pega entera (izquierda + sprints/meses) -->
+      <div class="gantt-head">
+        <div class="gh-left" style="width:${LW}px">
           <div class="lh">
             <div class="lh-cell">Nombre<div class="col-resize" data-col="--name-col" data-min="120"></div></div>
             <div class="lh-cell">Estado<div class="col-resize" data-col="--estado-col" data-min="60"></div></div>
@@ -1207,12 +1211,18 @@ function render() {
             <div class="lh-cell">Progreso<div class="col-resize" data-col="--prog-col" data-min="50"></div></div>
             <div class="lh-cell">Período<div class="col-resize" data-col="--periodo-col" data-min="80"></div></div>
           </div>
-          <div class="g-body" id="leftBody">${leftRows}</div>
         </div>
-        <div class="g-right" id="tlScroll">
+        <div class="gh-right" id="thScroll">
           <div class="th" style="width:${totalW}px">
             <div class="sprints-row">${timeAxis === 'month' ? monthCellsHtml : sprintsHtml}</div>
           </div>
+        </div>
+      </div>
+      <div class="gantt-inner">
+        <div class="g-left" style="width:${LW}px">
+          <div class="g-body" id="leftBody">${leftRows}</div>
+        </div>
+        <div class="g-right" id="tlScroll">
           <div style="position:relative;width:${totalW}px">
             ${timeAxis === 'month' ? monthBgHtml : sprintBgHtml}
             ${todayLine}
@@ -1222,11 +1232,19 @@ function render() {
       </div>
     </div>`;
 
-  // Sync vertical scroll
+  // Sync horizontal: el header de sprints sigue al scroll del timeline (y viceversa)
   const tl = document.getElementById('tlScroll');
+  const thS = document.getElementById('thScroll');
   const lb = document.getElementById('leftBody');
-  const rb = document.getElementById('rightBody');
-  tl.addEventListener('scroll', () => { lb.style.marginTop = `-${tl.scrollTop}px`; });
+  let syncing = false;
+  tl.addEventListener('scroll', () => {
+    if (syncing) return;
+    syncing = true; thS.scrollLeft = tl.scrollLeft; syncing = false;
+  });
+  thS.addEventListener('scroll', () => {
+    if (syncing) return;
+    syncing = true; tl.scrollLeft = thS.scrollLeft; syncing = false;
+  });
 
   // Solo auto-scroll en carga inicial, no al colapsar/expandir
   if (!render.skipScroll) {
@@ -1241,6 +1259,7 @@ function render() {
 
   // Activar resize handle
   initResizeHandle();
+  updateTopbarH();
 }
 
 // ─── Tooltip ──────────────────────────────────────────────────────────────────
@@ -1606,6 +1625,7 @@ function renderHoursPanel() {
       ${bars}
       <div class="hp-legend"><span><span class="sw" style="background:#2563eb"></span>Horas estimadas</span><span><span class="sw" style="background:#16a34a;width:3px"></span>Real consumido</span></div>
     </div>`;
+  updateTopbarH();
 }
 
 function toggleHoursDetail() {
@@ -1696,10 +1716,15 @@ async function loadData() {
 }
 
 // ─── Init ─────────────────────────────────────────────────────────────────────
-// Mantiene el resumen de Horas pegado justo debajo de la topbar (que puede cambiar de alto)
+// Mantiene el resumen de Horas y el header de columnas pegados debajo de la topbar
+// (ambos pueden cambiar de alto: topbar por wrap, horas por abrir/cerrar el detalle)
 function updateTopbarH() {
   const tb = document.querySelector('.topbar');
-  if (tb) document.documentElement.style.setProperty('--topbar-h', tb.offsetHeight + 'px');
+  const hp = document.getElementById('hoursPanel');
+  const tbH = tb ? tb.offsetHeight : 0;
+  const hpH = (hp && hp.style.display !== 'none') ? hp.offsetHeight : 0;
+  document.documentElement.style.setProperty('--topbar-h', tbH + 'px');
+  document.documentElement.style.setProperty('--content-top', (tbH + hpH) + 'px');
 }
 window.addEventListener('resize', updateTopbarH);
 window.addEventListener('load', updateTopbarH);
