@@ -822,7 +822,13 @@ function buildFullTree() {
   }
   // Ordenar cada nivel por tipo y luego por id
   function sortLevel(nodes) {
-    nodes.sort((a,b) => (TYPE_ORDER[a.type]??9) - (TYPE_ORDER[b.type]??9) || a.title.localeCompare(b.title, 'es', { numeric: true }));
+    // Orden por fecha de inicio del período (asc; sin fecha al final), luego tipo y título
+    nodes.sort((a,b) => {
+      const da = a.startDate ? a.startDate.getTime() : Infinity;
+      const db = b.startDate ? b.startDate.getTime() : Infinity;
+      if (da !== db) return da - db;
+      return (TYPE_ORDER[a.type]??9) - (TYPE_ORDER[b.type]??9) || a.title.localeCompare(b.title, 'es', { numeric: true });
+    });
     for (const n of nodes) sortLevel(n.children);
   }
   sortLevel(roots);
