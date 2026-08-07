@@ -624,7 +624,9 @@ async function fetchItemsByIds(ids) {
 // Trae los IDs que pasaron alguna vez por "Reopened" (operador EVER de WIQL, una sola query)
 async function fetchReopenedIds() {
   try {
-    const q = { query: `SELECT [System.Id] FROM WorkItems WHERE [System.TeamProject] = @project AND ([System.State] EVER 'Reopened' OR [System.State] EVER 'Reopen')` };
+    // Reabierto = pasó por estado "Reopened" O el Reason del historial fue "Reactivated"/"Reopened"
+    // (al mover Closed/Resolved → Active, ADO setea Reason = "Reactivated"). Operador EVER = historial.
+    const q = { query: `SELECT [System.Id] FROM WorkItems WHERE [System.TeamProject] = @project AND ([System.State] EVER 'Reopened' OR [System.State] EVER 'Reopen' OR [System.Reason] EVER 'Reactivated' OR [System.Reason] EVER 'Reopened')` };
     const r = await fetch(`${base()}/_apis/wit/wiql?api-version=7.1`, { method: 'POST', headers: authHdr(), body: JSON.stringify(q) });
     if (!r.ok) { console.warn('Query de reopen falló:', r.status); return new Set(); }
     const d = await r.json();
@@ -820,7 +822,13 @@ function buildFullTree() {
   }
   // Ordenar cada nivel por tipo y luego por id
   function sortLevel(nodes) {
-    nodes.sort((a,b) => (TYPE_ORDER[a.type]??9) - (TYPE_ORDER[b.type]??9) || a.title.localeCompare(b.title, 'es', { numeric: true }));
+    // Orden por fecha de inicio del período (asc; sin fecha al final), luego tipo y título
+    nodes.sort((a,b) => {
+      const da = a.startDate ? a.startDate.getTime() : Infinity;
+      const db = b.startDate ? b.startDate.getTime() : Infinity;
+      if (da !== db) return da - db;
+      return (TYPE_ORDER[a.type]??9) - (TYPE_ORDER[b.type]??9) || a.title.localeCompare(b.title, 'es', { numeric: true });
+    });
     for (const n of nodes) sortLevel(n.children);
   }
   sortLevel(roots);
