@@ -624,7 +624,9 @@ async function fetchItemsByIds(ids) {
 // Trae los IDs que pasaron alguna vez por "Reopened" (operador EVER de WIQL, una sola query)
 async function fetchReopenedIds() {
   try {
-    const q = { query: `SELECT [System.Id] FROM WorkItems WHERE [System.TeamProject] = @project AND ([System.State] EVER 'Reopened' OR [System.State] EVER 'Reopen')` };
+    // Reabierto = pasó por estado "Reopened" O el Reason del historial fue "Reactivated"/"Reopened"
+    // (al mover Closed/Resolved → Active, ADO setea Reason = "Reactivated"). Operador EVER = historial.
+    const q = { query: `SELECT [System.Id] FROM WorkItems WHERE [System.TeamProject] = @project AND ([System.State] EVER 'Reopened' OR [System.State] EVER 'Reopen' OR [System.Reason] EVER 'Reactivated' OR [System.Reason] EVER 'Reopened')` };
     const r = await fetch(`${base()}/_apis/wit/wiql?api-version=7.1`, { method: 'POST', headers: authHdr(), body: JSON.stringify(q) });
     if (!r.ok) { console.warn('Query de reopen falló:', r.status); return new Set(); }
     const d = await r.json();
