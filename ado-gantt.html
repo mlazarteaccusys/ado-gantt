@@ -658,7 +658,7 @@ async function fetchWorkItemsHierarchy(areaFilter = '') {
   const sourceCond = srcArea
     ? `Source.[System.State] ${NOTREM} ${srcArea}`
     : `Source.[System.WorkItemType] IN ('Epic','Improvement','Improvements') AND Source.[System.State] ${NOTREM}`;
-  const query = `SELECT [System.Id] FROM WorkItemLinks WHERE (${sourceCond}) AND ([System.Links.LinkType] = 'System.LinkTypes.Hierarchy-Forward') AND (Target.[System.WorkItemType] IN ('Feature','User Story','Technical Task','Task','Bug','Improvement','Improvements') AND Target.[System.State] ${NOTREM}) MODE (Recursive)`;
+  const query = `SELECT [System.Id] FROM WorkItemLinks WHERE (${sourceCond}) AND ([System.Links.LinkType] = 'System.LinkTypes.Hierarchy-Forward') AND (Target.[System.WorkItemType] IN ('Feature','User Story','Technical Task','Technical task','Task','Bug','Improvement','Improvements') AND Target.[System.State] ${NOTREM}) MODE (Recursive)`;
   const r = await fetch(`${base()}/_apis/wit/wiql?api-version=7.1`, {
     method: 'POST', headers: authHdr(), body: JSON.stringify({ query })
   });
@@ -682,7 +682,7 @@ async function fetchWorkItemsHierarchy(areaFilter = '') {
 // Consulta plana (fallback): lista chata con tope $top.
 async function fetchWorkItemsFlat(areaFilter = '') {
   const maxItems = cfg.maxItems || 500;
-  const wiql = { query: `SELECT [System.Id] FROM WorkItems WHERE [System.TeamProject] = @project AND [System.WorkItemType] IN ('Epic','Feature','User Story','Technical Task','Task','Bug','Improvement','Improvements') AND [System.State] NOT IN ('Removed','Cut','Cancelled','Rejected','Withdrawn') ${areaFilter} ORDER BY [System.WorkItemType] ASC, [System.Id] ASC` };
+  const wiql = { query: `SELECT [System.Id] FROM WorkItems WHERE [System.TeamProject] = @project AND [System.WorkItemType] IN ('Epic','Feature','User Story','Technical Task','Technical task','Task','Bug','Improvement','Improvements') AND [System.State] NOT IN ('Removed','Cut','Cancelled','Rejected','Withdrawn') ${areaFilter} ORDER BY [System.WorkItemType] ASC, [System.Id] ASC` };
   const r = await fetch(`${base()}/_apis/wit/wiql?$top=${maxItems}&api-version=7.1`, {
     method: 'POST', headers: authHdr(), body: JSON.stringify(wiql)
   });
@@ -747,6 +747,7 @@ function processItems(raw, iters) {
     // Normalizar tipo: en este ADO el tipo es "Improvements" (plural); lo mapeamos a "Improvement"
     let type = f['System.WorkItemType'];
     if (type === 'Improvements') type = 'Improvement';
+    if (type === 'Technical task') type = 'Technical Task'; // nombre real en ADO (t minúscula)
     const iter = findIter(f['System.IterationPath']);
 
     let startDate, endDate, hasExplicitDates = false;
@@ -1101,6 +1102,9 @@ function render() {
     const pad = item.depth * 16 + 6;
     const hasKids = item.hasVisibleKids;
     const isCol = collapsed.has(item.id);
+    // Estado a mostrar (Epic con rollup) y progreso alineado: si la Epic quedó "Closed", 100%
+    const dispState = item.type === 'Epic' ? epicDisplayState(item) : item.state;
+    const dispProg = (item.type === 'Epic' && dispState === 'Closed') ? 100 : item.progress;
     const cbtn = hasKids
       ? `<button class="cbtn" onclick="toggleCol(${item.id})">${isCol ? '▶' : '▼'}</button>`
       : '<span style="width:14px;flex-shrink:0;display:inline-block"></span>';
@@ -1116,12 +1120,12 @@ function render() {
             <a class="ititle" href="${wiUrl(item.id)}" target="_blank" rel="noopener" title="${esc(item.title)} — abrir #${item.id} en Azure DevOps">${esc(item.title)}</a>
           </div>
         </div>
-        <div class="l-cell">${(() => { const st = item.type === 'Epic' ? epicDisplayState(item) : item.state; return `<span class="sbadge ${statusCls(st)}">${esc(st)}</span>`; })()}</div>
+        <div class="l-cell"><span class="sbadge ${statusCls(dispState)}">${esc(dispState)}</span></div>
         <div class="l-cell">${hoursByEpic[item.id] ? (() => { const h = hoursByEpic[item.id]; const cls = hoursClass(h.real, h.est); const pct = h.est ? Math.round(h.real / h.est * 100) : 0; return `<span class="hp-inline ${cls}" title="${fmtHrs(h.real)} consumidas de ${fmtHrs(h.est)} estimadas">${fmtHrs(h.real)}/${fmtHrs(h.est)} · ${pct}%</span>`; })() : ''}</div>
         <div class="l-cell">
           <div class="pbar-wrap">
-            <div class="pbar-pct${item.progress >= 100 ? ' done' : ''}">${item.progress}%</div>
-            <div class="pbar"><div class="pbar-fill ${item.progress >= 100 ? 'pf-done' : pfCls(item.type)}" style="width:${item.progress}%"></div></div>
+            <div class="pbar-pct${dispProg >= 100 ? ' done' : ''}">${dispProg}%</div>
+            <div class="pbar"><div class="pbar-fill ${dispProg >= 100 ? 'pf-done' : pfCls(item.type)}" style="width:${dispProg}%"></div></div>
           </div>
         </div>
         <div class="l-cell" style="font-size:11px;color:#777">${fmtD(item.startDate)} – ${fmtD(item.endDate)}</div>
