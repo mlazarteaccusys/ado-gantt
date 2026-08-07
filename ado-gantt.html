@@ -52,6 +52,12 @@ body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Robo
 .axis-toggle { display: inline-flex; background: #f1f3f5; border: 1px solid #e2e4e9; border-radius: 8px; padding: 2px; gap: 2px; }
 .axis-opt { border: none; background: transparent; padding: 5px 12px; border-radius: 6px; font-size: 12px; font-weight: 600; color: #6b7280; cursor: pointer; transition: all .15s; }
 .axis-opt.active { background: #fff; color: #2563eb; box-shadow: 0 1px 2px rgba(16,24,40,.12); }
+/* Zoom del timeline */
+.zoom-ctl { display: inline-flex; align-items: center; gap: 4px; }
+.zoom-btn { width: 26px; height: 28px; border: 1px solid #e2e4e9; background: #fff; border-radius: 8px; font-size: 15px; font-weight: 700; color: #374151; cursor: pointer; line-height: 1; transition: all .15s; }
+.zoom-btn:hover { background: #f6f7f9; border-color: #d1d5db; }
+#zoomSel { height: 28px; border: 1px solid #e2e4e9; border-radius: 8px; background: #fff; font-size: 12px; font-weight: 600; color: #374151; padding: 0 6px; cursor: pointer; }
+#zoomSel:focus { outline: none; border-color: #2563eb; }
 /* Menú de filtros */
 .filter-menu { position: relative; display: inline-flex; }
 #filterBtn { display: inline-flex; align-items: center; gap: 6px; }
@@ -222,6 +228,8 @@ a.ititle:hover { color: #2563eb; text-decoration: underline; }
 .hp-bar { position: relative; height: 22px; background: #e5e7eb; border-radius: 5px; overflow: hidden; }
 .hp-bar-est { position: absolute; left: 0; top: 0; height: 100%; background: #2563eb; border-radius: 5px 0 0 5px; }
 .hp-bar-real { position: absolute; top: -2px; bottom: -2px; width: 3px; }
+.hp-row-counts { font-size: 11px; color: #6b7280; margin-top: 5px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.hp-rework { background: #fef2f2; color: #b91c1c; font-weight: 700; padding: 1px 8px; border-radius: 999px; }
 .hp-legend { font-size: 11px; color: #9ca3af; display: flex; gap: 16px; align-items: center; margin-top: 6px; }
 .hp-legend .sw { display: inline-block; width: 12px; height: 10px; border-radius: 2px; margin-right: 4px; vertical-align: middle; }
 /* Inline en filas de Epic */
@@ -304,6 +312,19 @@ a.ititle:hover { color: #2563eb; text-decoration: underline; }
     <button class="axis-opt" data-axis="month" onclick="setTimeAxis('month')">Mes</button>
   </div>
   <div class="sep"></div>
+  <div class="zoom-ctl" title="Zoom del timeline">
+    <button class="zoom-btn" onclick="zoomStep(-1)" title="Alejar">−</button>
+    <select id="zoomSel" onchange="setZoom(this.value)">
+      <option value="50">50%</option>
+      <option value="75">75%</option>
+      <option value="100" selected>100%</option>
+      <option value="125">125%</option>
+      <option value="150">150%</option>
+      <option value="200">200%</option>
+    </select>
+    <button class="zoom-btn" onclick="zoomStep(1)" title="Acercar">+</button>
+  </div>
+  <div class="sep"></div>
   <div class="filter-menu">
     <button class="btn" id="filterBtn" onclick="toggleFilterMenu(event)">Filtros<span class="filter-badge" id="filterBadge">Todos</span><span class="caret">▾</span></button>
     <div class="filter-pop" id="filterPop">
@@ -348,6 +369,7 @@ let activeTypes = new Set(['Epic','Feature','User Story','Technical Task','Task'
 let DAY_W = 28;
 let tlStart = null, tlDays = 0;
 let timeAxis = 'sprint';   // 'sprint' | 'month' — eje del encabezado del timeline
+let zoomPct = 100;         // zoom horizontal del timeline (%)
 
 // ─── Config ────────────────────────────────────────────────────────────────────
 function loadCfg() {
@@ -947,7 +969,9 @@ function pfCls(t) {
 // ─── Main render ───────────────────────────────────────────────────────────────
 function render() {
   const mount = document.getElementById('mount');
-  DAY_W = cfg.dayW || 28;
+  // Ancho de día: base según el eje (Mes más compacto), escalado por el zoom (%)
+  const baseDayW = timeAxis === 'month' ? 10 : (cfg.dayW || 28);
+  DAY_W = Math.max(2, Math.round(baseDayW * zoomPct / 100));
 
   const validIters = iterations.filter(i => i.startDate && i.endDate)
     .slice().sort((a, b) => a.startDate - b.startDate);
@@ -1353,8 +1377,21 @@ function matchHoursToEpics() {
       if (score > bestScore) { bestScore = score; best = ep; }
     }
     e.epicId = bestScore >= 1 ? best.id : null;
+    e.epicNode = bestScore >= 1 ? best : null;
     if (e.epicId) hoursByEpic[e.epicId] = e;
   }
+}
+
+// Cuenta descendientes de una Epic por tipo (para leer si el desvío es por retrabajo)
+function countDescByType(node) {
+  const c = { 'User Story': 0, 'Technical Task': 0, 'Task': 0, 'Improvement': 0, 'Bug': 0 };
+  (function walk(n) {
+    for (const ch of (n.children || [])) {
+      if (c[ch.type] !== undefined) c[ch.type]++;
+      walk(ch);
+    }
+  })(node || {});
+  return c;
 }
 
 function hoursClass(real, est) {
@@ -1390,6 +1427,16 @@ function renderHoursPanel() {
     const cls = hoursClass(e.real, e.est);
     const pct = e.est ? Math.round(e.real / e.est * 100) : 0;
     const realColor = cls === 'bad' ? '#dc2626' : (cls === 'warn' ? '#d97706' : '#16a34a');
+    let countsHtml = '';
+    if (e.epicNode) {
+      const c = countDescByType(e.epicNode);
+      const rework = c['Improvement'] + c['Bug'];
+      const parts = [`📗 ${c['User Story']} US`];
+      if (c['Technical Task']) parts.push(`⚙️ ${c['Technical Task']} TT`);
+      parts.push(`💡 ${c['Improvement']} Improv`);
+      parts.push(`🐛 ${c['Bug']} Bugs`);
+      countsHtml = `<div class="hp-row-counts">${parts.join(' · ')}${rework ? `<span class="hp-rework" title="Improvements + Bugs = trabajo no planificado (retrabajo)">↻ retrabajo ${rework}</span>` : ''}</div>`;
+    }
     bars += `<div class="hp-row">
       <div class="hp-row-head">
         <span class="hp-row-name">${esc(e.name)}</span>
@@ -1399,6 +1446,7 @@ function renderHoursPanel() {
         <div class="hp-bar-est" style="width:${e.est / max * 100}%"></div>
         <div class="hp-bar-real" style="left:calc(${e.real / max * 100}% - 1px);background:${realColor}"></div>
       </div>
+      ${countsHtml}
     </div>`;
   }
 
@@ -1416,12 +1464,6 @@ function renderHoursPanel() {
       <span class="hp-strip-toggle">${hoursDetailOpen ? 'Ocultar' : 'Ver detalle'} <span class="caret">${hoursDetailOpen ? '▲' : '▼'}</span></span>
     </div>
     <div class="hp-detail" style="display:${hoursDetailOpen ? 'block' : 'none'}">
-      <div class="hp-cards">
-        <div class="hp-card"><div class="lbl">Horas estimadas</div><div class="val">${fmtHrs(totEst)}</div><div class="sub">Línea base de ${hoursData.length} etapas</div></div>
-        <div class="hp-card"><div class="lbl">Horas consumidas</div><div class="val">${fmtHrs(totReal)}</div><div class="sub">${pctTot}% de la línea base</div></div>
-        <div class="hp-card ${desvClass}"><div class="lbl">Desvío total</div><div class="val">${desvio >= 0 ? '+' : ''}${fmtHrs(desvio)} hs</div><div class="sub">${desvio >= 0 ? '+' : ''}${desvPct}% sobre lo estimado</div></div>
-        <div class="hp-card bad"><div class="lbl">Concentración del desvío</div><div class="val">${esc(concShort)}</div><div class="sub">${concD >= 0 ? '+' : ''}${fmtHrs(concD)} hs (${concPct}% de su base)</div></div>
-      </div>
       <div class="hp-title">Consumo por etapa (estimado vs. real)</div>
       ${bars}
       <div class="hp-legend"><span><span class="sw" style="background:#2563eb"></span>Horas estimadas</span><span><span class="sw" style="background:#16a34a;width:3px"></span>Real consumido</span></div>
@@ -1431,6 +1473,22 @@ function renderHoursPanel() {
 function toggleHoursDetail() {
   hoursDetailOpen = !hoursDetailOpen;
   renderHoursPanel();
+}
+
+// ─── Zoom del timeline ───────────────────────────────────────────────────────
+const ZOOM_LEVELS = [50, 75, 100, 125, 150, 200];
+function setZoom(v) {
+  zoomPct = parseInt(v) || 100;
+  const sel = document.getElementById('zoomSel');
+  if (sel && sel.value != String(zoomPct)) sel.value = String(zoomPct);
+  rerenderKeepScroll();
+}
+function zoomStep(dir) {
+  // Movés al preset anterior/siguiente respecto del zoom actual
+  let idx = ZOOM_LEVELS.indexOf(zoomPct);
+  if (idx === -1) idx = ZOOM_LEVELS.findIndex(z => z >= zoomPct);
+  idx = Math.max(0, Math.min(ZOOM_LEVELS.length - 1, idx + dir));
+  setZoom(ZOOM_LEVELS[idx]);
 }
 
 // Cambia el eje del encabezado del timeline (por sprint o por mes)
