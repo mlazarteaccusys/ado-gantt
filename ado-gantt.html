@@ -196,7 +196,7 @@ a.ititle:hover { color: #2563eb; text-decoration: underline; }
 .gtt { position: fixed; background: #1e293b; color: white; font-size: 12px; padding: 8px 12px; border-radius: 6px; pointer-events: none; z-index: 999; max-width: 280px; line-height: 1.5; display: none; box-shadow: 0 4px 12px rgba(0,0,0,.3); }
 
 /* ── Panel de Horas ── */
-#hoursPanel { padding: 8px 20px; background: #fafbfc; border-bottom: 1px solid #e8eaed; }
+#hoursPanel { padding: 8px 20px; background: #fafbfc; border-bottom: 1px solid #e8eaed; position: sticky; top: var(--topbar-h, 54px); z-index: 90; }
 /* Strip resumen (colapsado por defecto) */
 .hp-strip { display: flex; align-items: center; justify-content: space-between; gap: 12px; cursor: pointer; padding: 5px 2px; }
 .hp-strip:hover .hp-strip-toggle { color: #2563eb; }
@@ -1696,6 +1696,15 @@ async function loadData() {
 }
 
 // ─── Init ─────────────────────────────────────────────────────────────────────
+// Mantiene el resumen de Horas pegado justo debajo de la topbar (que puede cambiar de alto)
+function updateTopbarH() {
+  const tb = document.querySelector('.topbar');
+  if (tb) document.documentElement.style.setProperty('--topbar-h', tb.offsetHeight + 'px');
+}
+window.addEventListener('resize', updateTopbarH);
+window.addEventListener('load', updateTopbarH);
+updateTopbarH();
+
 syncFilterMenu();
 loadCfg();
 </script>
