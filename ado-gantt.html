@@ -495,7 +495,8 @@ async function onTeamChange(teamName) {
     // Obtener area paths del equipo seleccionado y recargar todo
     const areaPaths = await fetchTeamAreaPaths(teamName);
     currentAreaFilter = buildAreaFilter(areaPaths);
-    const [iters, raw] = await Promise.all([fetchIterations(), fetchWorkItems(currentAreaFilter)]);
+    const [iters, raw, reop] = await Promise.all([fetchIterations(), fetchWorkItems(currentAreaFilter), fetchReopenedIds()]);
+    reopenedIds = reop;
     iterations = iters;
     lastRaw = raw;
     workItems = processItems(raw, iters);
@@ -596,11 +597,12 @@ async function fetchIterations() {
 // ─── Fetch work items ──────────────────────────────────────────────────────────
 let lastRaw = []; // cache para no re-fetchear al cambiar solo el equipo/sprint
 let linkParents = {}; // {childId: parentId} según los vínculos jerárquicos reales de ADO
+let reopenedIds = new Set(); // IDs que pasaron alguna vez por estado "Reopened" (retrabajo)
 let currentAreaFilter = ''; // cláusula WHERE de area path activa
 
 const WI_FIELDS = [
   'System.Id','System.Title','System.WorkItemType','System.State',
-  'System.IterationPath','System.Parent','System.AssignedTo',
+  'System.IterationPath','System.Parent','System.AssignedTo','System.Tags',
   'Microsoft.VSTS.Scheduling.StartDate','Microsoft.VSTS.Scheduling.FinishDate',
   'Microsoft.VSTS.Scheduling.TargetDate',
   'Microsoft.VSTS.Scheduling.CompletedWork','Microsoft.VSTS.Scheduling.RemainingWork',
@@ -616,6 +618,17 @@ async function fetchItemsByIds(ids) {
     raw.push(...(d.value || []));
   }
   return raw;
+}
+
+// Trae los IDs que pasaron alguna vez por "Reopened" (operador EVER de WIQL, una sola query)
+async function fetchReopenedIds() {
+  try {
+    const q = { query: `SELECT [System.Id] FROM WorkItems WHERE [System.TeamProject] = @project AND ([System.State] EVER 'Reopened' OR [System.State] EVER 'Reopen')` };
+    const r = await fetch(`${base()}/_apis/wit/wiql?api-version=7.1`, { method: 'POST', headers: authHdr(), body: JSON.stringify(q) });
+    if (!r.ok) { console.warn('Query de reopen falló:', r.status); return new Set(); }
+    const d = await r.json();
+    return new Set((d.workItems || []).map(w => w.id));
+  } catch (e) { console.warn('Query de reopen falló:', e); return new Set(); }
 }
 
 // Wrapper: combina la consulta jerárquica (descendientes de Epics, sin importar área/tope)
@@ -763,6 +776,7 @@ function processItems(raw, iters) {
       iterPath: f['System.IterationPath'] || '',
       parentId: linkParents[item.id] || f['System.Parent'] || null,
       startDate, endDate, progress, iter, hasExplicitDates,
+      tags: f['System.Tags'] || '',
       assignee: assigneeName,
       priority: f['Microsoft.VSTS.Common.Priority'] || 0,
       children: [],
@@ -1416,6 +1430,30 @@ function countDescByType(node) {
   return c;
 }
 
+function hasTag(item, tag) {
+  return (item.tags || '').split(';').some(t => t.trim().toLowerCase() === tag.toLowerCase());
+}
+// Cuenta ítems de retrabajo (únicos): Bugs/Improvements + tag CarryOver + reabiertos (EVER Reopened)
+function countRework(node) {
+  let total = 0, bugimp = 0, carry = 0, reopen = 0;
+  const seen = new Set();
+  (function walk(n) {
+    for (const ch of (n.children || [])) {
+      const isBI = ch.type === 'Bug' || ch.type === 'Improvement';
+      const isCarry = hasTag(ch, 'CarryOver');
+      const isReopen = reopenedIds.has(ch.id);
+      if ((isBI || isCarry || isReopen) && !seen.has(ch.id)) {
+        seen.add(ch.id); total++;
+        if (isBI) bugimp++;
+        if (isCarry) carry++;
+        if (isReopen) reopen++;
+      }
+      walk(ch);
+    }
+  })(node || {});
+  return { total, bugimp, carry, reopen };
+}
+
 function hoursClass(real, est) {
   if (!est) return 'ok';
   const pct = real / est;
@@ -1452,12 +1490,13 @@ function renderHoursPanel() {
     let countsHtml = '';
     if (e.epicNode) {
       const c = countDescByType(e.epicNode);
-      const rework = c['Improvement'] + c['Bug'];
+      const rw = countRework(e.epicNode);
       const parts = [`📗 ${c['User Story']} US`];
       if (c['Technical Task']) parts.push(`⚙️ ${c['Technical Task']} TT`);
       parts.push(`💡 ${c['Improvement']} Improv`);
       parts.push(`🐛 ${c['Bug']} Bugs`);
-      countsHtml = `<div class="hp-row-counts">${parts.join(' · ')}${rework ? `<span class="hp-rework" title="Improvements + Bugs = trabajo no planificado (retrabajo)">↻ retrabajo ${rework}</span>` : ''}</div>`;
+      const rwTip = `Retrabajo: ${rw.bugimp} bugs/improv · ${rw.carry} CarryOver · ${rw.reopen} reabiertos (únicos: ${rw.total})`;
+      countsHtml = `<div class="hp-row-counts">${parts.join(' · ')}${rw.total ? `<span class="hp-rework" title="${rwTip}">↻ retrabajo ${rw.total}</span>` : ''}</div>`;
     }
     bars += `<div class="hp-row">
       <div class="hp-row-head">
@@ -1543,10 +1582,12 @@ async function loadData() {
     currentAreaFilter = buildAreaFilter(areaPaths);
 
     // Luego iteraciones y work items con el filtro aplicado
-    const [iters, raw] = await Promise.all([
+    const [iters, raw, reop] = await Promise.all([
       fetchIterations(),
       fetchWorkItems(currentAreaFilter),
+      fetchReopenedIds(),
     ]);
+    reopenedIds = reop;
 
     teams      = fetchedTeams;
     iterations = iters;
