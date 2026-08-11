@@ -236,6 +236,25 @@ a.ititle:hover { color: #2563eb; text-decoration: underline; }
 .hp-row-counts { font-size: 11px; color: #6b7280; margin-top: 5px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 .hp-rework { background: #fef2f2; color: #b91c1c; font-weight: 700; padding: 1px 8px; border-radius: 999px; }
 .hp-carry { background: #fff7ed; color: #c2410c; font-weight: 700; padding: 1px 8px; border-radius: 999px; }
+/* Avance del proyecto (strip) */
+.hp-avance { display: inline-flex; align-items: center; gap: 6px; }
+.hp-avance b { color: #1d4ed8; }
+.hp-avance b.ok { color: #15803d; }
+.hp-mini-bar { display: inline-block; width: 70px; height: 6px; background: #e5e7eb; border-radius: 3px; overflow: hidden; }
+.hp-mini-fill { display: block; height: 100%; background: #2563eb; border-radius: 3px; }
+.hp-mini-fill.done { background: #16a34a; }
+.hp-falta { color: #6b7280; font-size: 11.5px; }
+/* Grupos por trimestre */
+.hp-qgroup { margin-bottom: 18px; }
+.hp-qhead { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; padding: 5px 0 8px; margin-bottom: 8px; border-bottom: 1px solid #e5e7eb; }
+.hp-qname { font-size: 12px; font-weight: 800; color: #374151; text-transform: uppercase; letter-spacing: .4px; }
+.hp-qfig { font-size: 11.5px; color: #6b7280; }
+.hp-qprog { color: #1d4ed8; }
+.hp-qprog.done { color: #15803d; }
+.hp-qfig b.ok { color: #15803d; } .hp-qfig b.warn { color: #b45309; } .hp-qfig b.bad { color: #b91c1c; }
+/* Chip de avance por etapa */
+.hp-prog-chip { font-size: 10px; font-weight: 700; padding: 1px 7px; border-radius: 999px; margin-left: 8px; background: #eff6ff; color: #1d4ed8; }
+.hp-prog-chip.done { background: #dcfce7; color: #15803d; }
 .hp-legend { font-size: 11px; color: #9ca3af; display: flex; gap: 16px; align-items: center; margin-top: 6px; }
 .hp-legend .sw { display: inline-block; width: 12px; height: 10px; border-radius: 2px; margin-right: 4px; vertical-align: middle; }
 /* Inline en filas de Epic */
@@ -1557,6 +1576,36 @@ function hoursClass(real, est) {
 }
 function fmtHrs(n) { return (Math.round(n * 10) / 10).toLocaleString('es-AR'); }
 
+// ─── Avance y compromiso por trimestre ───────────────────────────────────────
+// Compromiso por Q (editable): a qué trimestre pertenece cada etapa, por nombre.
+const Q_RULES = [
+  { q: 'Q1', match: /fase\s*0|core\s*estable/i },
+  { q: 'Q2', match: /fase\s*2|new\s*look/i },
+  { q: 'Q3', match: /fase\s*4|new\s*ejecutor|planificador/i },
+  { q: 'Q4', match: /configuraci/i },
+];
+const Q_LABEL = { Q1: 'Q1 · Core Estable', Q2: 'Q2 · Fase 2 + New Look and Feel', Q3: 'Q3 · Fase 4 + New Ejecutor + Planificador', Q4: 'Q4 · Configuración', '—': 'Sin trimestre asignado' };
+
+function stageQuarter(e) {
+  for (const r of Q_RULES) if (r.match.test(e.name || '')) return r.q;
+  return '—';
+}
+// % de avance real de la etapa (progreso de su Epic; 100 si el rollup la da por cerrada)
+function stageProgress(e) {
+  if (!e.epicNode) return null;
+  return epicDisplayState(e.epicNode) === 'Closed' ? 100 : (e.epicNode.progress || 0);
+}
+// Avance global ponderado por horas estimadas: Σ(est × progreso) / Σ(est)
+function projectProgress(entries) {
+  let num = 0, den = 0;
+  for (const e of entries) {
+    const p = stageProgress(e);
+    if (p === null) continue;
+    num += e.est * p; den += e.est;
+  }
+  return den ? Math.round(num / den) : null;
+}
+
 function renderHoursPanel() {
   const panel = document.getElementById('hoursPanel');
   if (!hoursData.length) { panel.style.display = 'none'; return; }
@@ -1576,8 +1625,8 @@ function renderHoursPanel() {
   const desvClass = desvio > totEst * 0.05 ? 'bad' : (desvio > 0 ? 'warn' : 'ok');
   const max = Math.max(...hoursData.map(e => Math.max(e.est, e.real)), 1);
 
-  let bars = '';
-  for (const e of hoursData) {
+  // Render de una barra de etapa
+  function barHtmlFor(e) {
     const cls = hoursClass(e.real, e.est);
     const pct = e.est ? Math.round(e.real / e.est * 100) : 0;
     const realColor = cls === 'bad' ? '#dc2626' : (cls === 'warn' ? '#d97706' : '#16a34a');
@@ -1594,9 +1643,12 @@ function renderHoursPanel() {
       const carryChip = rw.carry ? `<span class="hp-carry" title="Tickets con tag CarryOver">⇄ CarryOver ${rw.carry}</span>` : '';
       countsHtml = `<div class="hp-row-counts">${parts.join(' · ')}${rwChip}${carryChip}</div>`;
     }
-    bars += `<div class="hp-row">
+    const prog = stageProgress(e);
+    const progChip = prog !== null
+      ? `<span class="hp-prog-chip${prog >= 100 ? ' done' : ''}" title="Avance del trabajo de la etapa">${prog}% avance</span>` : '';
+    return `<div class="hp-row">
       <div class="hp-row-head">
-        <span class="hp-row-name">${esc(e.name)}</span>
+        <span class="hp-row-name">${esc(e.name)}${progChip}</span>
         <span class="hp-row-fig">${fmtHrs(e.est)} est · <b class="${cls}">${fmtHrs(e.real)} real (${pct}%)</b></span>
       </div>
       <div class="hp-bar">
@@ -1607,7 +1659,33 @@ function renderHoursPanel() {
     </div>`;
   }
 
+  // Agrupar las etapas por trimestre comprometido
+  let bars = '';
+  const byQ = {};
+  for (const e of hoursData) { const q = stageQuarter(e); (byQ[q] = byQ[q] || []).push(e); }
+  const qOrder = ['Q1','Q2','Q3','Q4','—'].filter(q => byQ[q]);
+  for (const q of qOrder) {
+    const list = byQ[q];
+    const qEst = list.reduce((a, e) => a + e.est, 0);
+    const qReal = list.reduce((a, e) => a + e.real, 0);
+    const qProg = projectProgress(list);
+    const qCls = hoursClass(qReal, qEst);
+    bars += `<div class="hp-qgroup">
+      <div class="hp-qhead">
+        <span class="hp-qname">${esc(Q_LABEL[q] || q)}</span>
+        <span class="hp-qfig">${qProg !== null ? `<b class="hp-qprog${qProg >= 100 ? ' done' : ''}">${qProg}% avance</b> · ` : ''}${fmtHrs(qEst)} est · <b class="${qCls}">${fmtHrs(qReal)} real</b></span>
+      </div>
+      ${list.map(barHtmlFor).join('')}
+    </div>`;
+  }
+
   const desvPct = totEst ? Math.round(desvio / totEst * 1000) / 10 : 0;
+  // Avance global (ponderado por horas est.) y horas estimadas del trabajo pendiente
+  const projProg = projectProgress(hoursData);
+  const pendEst = hoursData.reduce((a, e) => {
+    const p = stageProgress(e);
+    return a + (p === null ? 0 : e.est * (100 - p) / 100);
+  }, 0);
   panel.innerHTML = `
     <div class="hp-strip" onclick="toggleHoursDetail()" title="Ver detalle de horas">
       <div class="hp-strip-figs">
@@ -1617,6 +1695,12 @@ function renderHoursPanel() {
         <span>Consumidas <b>${fmtHrs(totReal)}</b></span>
         <span class="hp-dot">·</span>
         <span>Desvío <b class="${desvClass}">${desvio >= 0 ? '+' : ''}${fmtHrs(desvio)} hs (${desvPct >= 0 ? '+' : ''}${desvPct}%)</b></span>
+        ${projProg !== null ? `<span class="hp-dot">·</span>
+        <span class="hp-avance" title="Avance del trabajo, ponderado por horas estimadas de cada etapa">Avance
+          <b class="${projProg >= 100 ? 'ok' : ''}">${projProg}%</b>
+          <span class="hp-mini-bar"><span class="hp-mini-fill${projProg >= 100 ? ' done' : ''}" style="width:${projProg}%"></span></span>
+          <span class="hp-falta">${projProg >= 100 ? 'completado' : `falta ${100 - projProg}% · ~${fmtHrs(pendEst)} hs est`}</span>
+        </span>` : ''}
       </div>
       <span class="hp-strip-toggle">${hoursDetailOpen ? 'Ocultar' : 'Ver detalle'} <span class="caret">${hoursDetailOpen ? '▲' : '▼'}</span></span>
     </div>
