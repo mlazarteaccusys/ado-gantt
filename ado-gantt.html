@@ -96,7 +96,16 @@ body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Robo
 .g-right { flex: 1; overflow-x: auto; overflow-y: hidden; position: relative; }
 
 /* ── Left header ── */
-:root { --name-col: 220px; --estado-col: 95px; --horas-col: 110px; --prog-col: 72px; --periodo-col: 145px; }
+:root {
+  --name-col: 220px; --estado-col: 95px; --horas-col: 110px; --prog-col: 72px; --periodo-col: 145px;
+  /* Tokens de estado (Alto Nivel): color = salud (ok/warn/crit) o avance (plan). Nada decorativo. */
+  --ok: oklch(0.58 0.14 155);        --ok-soft: oklch(0.95 0.04 155);
+  --warn: oklch(0.65 0.15 62);       --warn-soft: oklch(0.96 0.05 80);
+  --crit: oklch(0.55 0.20 27);       --crit-soft: oklch(0.95 0.03 27);
+  --plan: oklch(0.62 0.16 260);      /* avance */
+  --track: oklch(0.94 0.006 250);    /* fondo de pista */
+  --text-meta: 0.6875rem;
+}
 .lh { display: grid; grid-template-columns: var(--name-col) var(--estado-col) var(--horas-col) var(--prog-col) var(--periodo-col); background: #f7f8fa; border-bottom: 2px solid #e0e0e0; height: 65px; border-radius: 8px 0 0 0; }
 .lh-cell { padding: 0 10px; display: flex; align-items: center; font-size: 11px; font-weight: 700; color: #666; text-transform: uppercase; letter-spacing: 0.4px; border-right: 1px solid #e8e8e8; position: relative; }
 .col-resize { position: absolute; right: 0; top: 0; bottom: 0; width: 6px; cursor: col-resize; background: transparent; z-index: 10; }
@@ -228,8 +237,8 @@ a.ititle:hover { color: #2563eb; text-decoration: underline; }
 .gtt { position: fixed; background: #1e293b; color: white; font-size: 12px; padding: 8px 12px; border-radius: 6px; pointer-events: none; z-index: 999; max-width: 280px; line-height: 1.5; display: none; box-shadow: 0 4px 12px rgba(0,0,0,.3); }
 
 /* Chips de retrabajo/carryover (usados en la vista Alto Nivel) */
-.hp-rework { color: #b91c1c; font-weight: 600; }
-.hp-carry { color: #c2410c; font-weight: 600; }
+.hp-rework { color: var(--crit); font-weight: 600; }
+.hp-carry { color: var(--warn); font-weight: 600; }
 .hp-rework b, .hp-carry b { font-weight: 800; }
 /* Inline en filas de Epic */
 .hp-inline { font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 8px; margin-left: 6px; white-space: nowrap; }
@@ -238,52 +247,55 @@ a.ititle:hover { color: #2563eb; text-decoration: underline; }
 .hp-inline.bad  { background: #fee2e2; color: #b91c1c; }
 
 /* ── Tab "Alto Nivel" ── */
+/* Console operacional: color = salud (ok/warn/crit) o avance (plan). Nunca decorativo. */
 .an-page { padding: 24px 4px 48px; max-width: 1100px; margin: 0 auto; }
-.an-header h2 { font-size: 19px; font-weight: 800; color: #111827; margin-bottom: 4px; }
+.an-header h2 { font-size: 20px; font-weight: 700; letter-spacing: -0.01em; color: #111827; margin-bottom: 4px; }
 .an-header p { font-size: 13px; color: #6b7280; margin-bottom: 22px; }
-.an-stats { display: flex; border: 1px solid #e5e7eb; border-radius: 12px; overflow: hidden; margin-bottom: 26px; background: #fff; box-shadow: 0 1px 2px rgba(16,24,40,.04); }
+.an-stats { display: flex; border: 1px solid #e5e7eb; border-radius: 10px; overflow: hidden; margin-bottom: 26px; background: #fff; }
 .an-stat { flex: 1; padding: 14px 20px; border-right: 1px solid #eef0f2; }
 .an-stat:last-child { border-right: none; }
-.an-stat .lbl { font-size: 10px; font-weight: 700; color: #9ca3af; text-transform: uppercase; letter-spacing: .5px; margin-bottom: 6px; }
-.an-stat .val { font-size: 21px; font-weight: 800; color: #111827; font-variant-numeric: tabular-nums; }
-.an-stat .val.bad { color: #b91c1c; } .an-stat .val.warn { color: #b45309; } .an-stat .val.ok { color: #15803d; }
-.an-qcard { border: 1px solid #e5e7eb; border-radius: 12px; background: #fff; margin-bottom: 18px; overflow: hidden; box-shadow: 0 1px 2px rgba(16,24,40,.04); }
+.an-stat .lbl { font-size: var(--text-meta); font-weight: 700; color: #9ca3af; text-transform: uppercase; letter-spacing: .05em; margin-bottom: 6px; }
+.an-stat .val { font-size: 18px; font-weight: 700; color: #111827; font-variant-numeric: tabular-nums; }
+.an-stat .val.bad { color: var(--crit); } .an-stat .val.warn { color: var(--warn); } .an-stat .val.ok { color: var(--ok); }
+.an-qcard { border: 1px solid #e5e7eb; border-radius: 10px; background: #fff; margin-bottom: 18px; overflow: hidden; }
 .an-qhead { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 18px; cursor: pointer; user-select: none; }
 .an-qhead:hover { background: #fafbfc; }
 .an-qlead { display: flex; align-items: center; gap: 10px; min-width: 0; }
-.an-qbadge { font-size: 11px; font-weight: 800; color: #fff; background: #111827; padding: 3px 9px; border-radius: 6px; flex-shrink: 0; }
-.an-qname { font-size: 14px; font-weight: 700; color: #1f2937; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.an-qbadge { font-size: var(--text-meta); font-weight: 700; color: #fff; background: #111827; padding: 3px 9px; border-radius: 6px; flex-shrink: 0; }
+.an-qname { font-size: 0.9375rem; font-weight: 600; letter-spacing: -0.01em; color: #1f2937; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .an-qright { display: flex; align-items: baseline; gap: 12px; flex-shrink: 0; }
-.an-qfig { font-size: 11px; color: #9ca3af; font-variant-numeric: tabular-nums; white-space: nowrap; }
-.an-qpct { font-size: 19px; font-weight: 800; color: #111827; font-variant-numeric: tabular-nums; }
-.an-qcaret { color: #9ca3af; font-size: 12px; width: 14px; text-align: center; }
+.an-qfig { font-size: var(--text-meta); color: #9ca3af; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.an-qpct { font-size: 18px; font-weight: 700; color: #111827; font-variant-numeric: tabular-nums; }
+.an-qcaret { color: #9ca3af; font-size: 12px; width: 14px; text-align: center; transition: transform .15s; }
 .an-qbody { padding: 0 18px 4px; }
 .an-row { padding: 16px 0; border-top: 1px solid #f0f1f3; }
 .an-row:first-child { border-top: none; }
-.an-row-name { font-size: 13px; font-weight: 700; color: #1f2937; }
-.an-row-ef { font-size: 11px; color: #9ca3af; margin-left: 7px; font-weight: 500; }
-.an-row-grid { display: grid; grid-template-columns: 1fr 200px; gap: 22px; margin-top: 9px; align-items: center; }
-.an-toprow { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 6px; font-size: 11px; gap: 8px; }
-.an-avance-lbl { font-weight: 700; font-size: 11px; letter-spacing: .2px; }
-.an-avance-lbl.done { color: #15803d; } .an-avance-lbl.wip { color: #2563eb; } .an-avance-lbl.zero { color: #9ca3af; }
-.an-status { font-weight: 700; margin-left: 8px; font-size: 11px; }
-.an-status.over { color: #b91c1c; } .an-status.near { color: #c2410c; } .an-status.none { color: #9ca3af; }
-.an-gasto { color: #9ca3af; white-space: nowrap; }
-.an-bar { position: relative; height: 8px; background: #eceef1; border-radius: 4px; }
-.an-bar-fill { position: absolute; left: 0; top: 0; height: 100%; background: #3b82f6; border-radius: 4px; }
-.an-bar-fill.done { background: #16a34a; }
-.an-bar-ref { position: absolute; top: -3px; bottom: -3px; width: 1px; background: #d1d5db; }
-.an-bar-marker { position: absolute; top: -4px; bottom: -4px; width: 2px; border-radius: 1px; background: #f59e0b; }
-.an-bar-marker.over { background: #dc2626; }
-.an-counts { margin-top: 8px; font-size: 11px; color: #9ca3af; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.an-row-name { font-size: 0.9375rem; font-weight: 600; letter-spacing: -0.01em; color: #1f2937; }
+.an-row-ef { font-size: var(--text-meta); color: #9ca3af; margin-left: 7px; font-weight: 500; letter-spacing: .01em; }
+.an-row-grid { display: grid; grid-template-columns: minmax(0,1fr) 200px; gap: 24px; margin-top: 9px; align-items: center; }
+.an-toprow { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 6px; font-size: var(--text-meta); gap: 8px; }
+/* "avance" es progreso, no salud: siempre en tono plan (azul), nunca cambia por estado */
+.an-avance-lbl { font-weight: 700; font-size: var(--text-meta); letter-spacing: .01em; color: var(--plan); }
+.an-avance-lbl.zero { color: #9ca3af; }
+.an-status { font-weight: 700; margin-left: 8px; font-size: var(--text-meta); }
+.an-status.over { color: var(--crit); } .an-status.near { color: var(--warn); } .an-status.none { color: #9ca3af; }
+.an-gasto { color: #9ca3af; white-space: nowrap; font-size: var(--text-meta); }
+.an-bar { position: relative; height: 10px; background: var(--track); border-radius: 5px; }
+.an-bar-fill { position: absolute; left: 0; top: 0; height: 100%; background: var(--plan); border-radius: 5px; }
+.an-bar-ref { position: absolute; top: -3px; bottom: -3px; width: 1px; background: rgba(17,24,39,.35); }
+/* Marcador de gasto: único color con significado de salud (ok=dentro, near=cerca, over=excedido) */
+.an-bar-marker { position: absolute; top: -4px; bottom: -4px; width: 4px; border-radius: 1px; background: var(--ok); }
+.an-bar-marker.near { background: var(--warn); }
+.an-bar-marker.over { background: var(--crit); }
+.an-counts { margin-top: 8px; font-size: var(--text-meta); color: #9ca3af; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 .an-right { display: flex; align-items: center; justify-content: flex-end; gap: 12px; }
-.an-num { font-size: 19px; font-weight: 800; color: #111827; line-height: 1.15; text-align: right; font-variant-numeric: tabular-nums; }
-.an-sub { font-size: 11px; color: #9ca3af; margin-top: 2px; text-align: right; }
-.an-badge { font-size: 12px; font-weight: 800; padding: 3px 10px; border-radius: 8px; white-space: nowrap; font-variant-numeric: tabular-nums; }
-.an-badge.over  { background: #fef2f2; color: #b91c1c; }
-.an-badge.under { background: #f0fdf4; color: #15803d; }
+.an-num { font-size: 18px; font-weight: 700; color: #111827; line-height: 1.15; text-align: right; font-variant-numeric: tabular-nums; }
+.an-sub { font-size: var(--text-meta); color: #9ca3af; margin-top: 2px; text-align: right; }
+.an-badge { font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 8px; white-space: nowrap; font-variant-numeric: tabular-nums; min-width: 56px; text-align: center; display: inline-block; }
+.an-badge.over  { background: var(--crit-soft); color: var(--crit); }
+.an-badge.under { background: var(--ok-soft); color: var(--ok); }
 .an-badge.flat  { background: #f3f4f6; color: #9ca3af; }
-.an-footer { display: flex; justify-content: space-between; align-items: center; font-size: 11px; color: #9ca3af; margin-top: 6px; flex-wrap: wrap; gap: 10px; padding: 0 4px; }
+.an-footer { display: flex; justify-content: space-between; align-items: center; font-size: var(--text-meta); color: #9ca3af; margin-top: 6px; flex-wrap: wrap; gap: 10px; padding: 0 4px; }
 .an-footer .sw { display: inline-block; width: 13px; height: 8px; border-radius: 2px; margin: 0 5px 0 14px; vertical-align: middle; }
 .an-footer .sw:first-child { margin-left: 0; }
 .an-empty { padding: 60px 20px; text-align: center; color: #9ca3af; font-size: 13px; }
@@ -1862,7 +1874,7 @@ function renderAltoNivel() {
           <div class="an-bar">
             <div class="an-bar-fill${m.avance >= 100 ? ' done' : ''}" style="width:${fillPct}%"></div>
             <div class="an-bar-ref" style="left:${refPct}%" title="100% del estimado"></div>
-            ${markerPct != null && e.real > 0 ? `<div class="an-bar-marker${m.status === 'over' ? ' over' : ''}" style="left:${markerPct}%" title="${Math.round(m.gasto)}% gasto"></div>` : ''}
+            ${markerPct != null && e.real > 0 ? `<div class="an-bar-marker${m.status ? ' ' + m.status : ''}" style="left:${markerPct}%" title="${Math.round(m.gasto)}% gasto"></div>` : ''}
           </div>
           ${countsHtml}
         </div>
@@ -1919,7 +1931,7 @@ function renderAltoNivel() {
       </div>
       ${qHtml}
       <div class="an-footer">
-        <span><span class="sw" style="background:#3b82f6"></span>avance<span class="sw" style="background:#f59e0b"></span>gasto<span class="sw" style="background:#d1d5db"></span>100% del estimado</span>
+        <span><span class="sw" style="background:var(--plan)"></span>avance<span class="sw" style="background:#9ca3af"></span>gasto (color = salud)<span class="sw" style="background:rgba(17,24,39,.35)"></span>100% del estimado</span>
         <span>ef = avance% ÷ consumo% · 1.00 significa avanzar al ritmo planificado</span>
       </div>
     </div>`;
