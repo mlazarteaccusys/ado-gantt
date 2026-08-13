@@ -987,7 +987,7 @@ function applyQuarterLevel() {
     const ends = kids.map(k => k.endDate).filter(Boolean);
     const qn = {
       id: -1000 - i, // id sintético: nunca colisiona con un ID real de ADO (siempre positivo)
-      title: (Q_LABEL[q] || q).replace(/^Q\d\s*·\s*/, ''),
+      title: Q_LABEL[q] || q,
       type: 'Quarter', qKey: q, state: '', iterPath: '', iter: null,
       assignee: '', priority: 0, tags: '',
       hasExplicitDates: !!(starts.length && ends.length),
