@@ -1174,7 +1174,7 @@ function render() {
           </div>
         </div>
         <div class="l-cell"><span class="sbadge ${statusCls(dispState)}">${esc(dispState)}</span></div>
-        <div class="l-cell">${hoursByEpic[item.id] ? (() => { const h = hoursByEpic[item.id]; const cls = hoursClass(h.real, h.est); const over = (h.est && h.real > h.est) ? Math.round((h.real - h.est) / h.est * 100) : null; const tip = `${fmtHrs(h.real)} consumidas de ${fmtHrs(h.est)} estimadas` + (over !== null ? ` — ${over}% por encima de lo estimado` : ' — dentro de lo estimado'); return `<span class="hp-inline ${cls}" title="${tip}">${fmtHrs(h.real)}/${fmtHrs(h.est)}${over !== null ? ` · +${over}%` : ''}</span>`; })() : ''}</div>
+        <div class="l-cell">${hoursByEpic[item.id] ? (() => { const h = hoursByEpic[item.id]; const cls = hoursClass(h.real, h.est); const over = (h.est && h.real > h.est) ? Math.round((h.real - h.est) / h.est * 100) : null; const tip = `${fmtHrs(h.real)} consumidas de ${fmtHrs(h.est)} estimadas` + (over !== null ? ` — ${over}% por encima de lo estimado` : ' — dentro de lo estimado'); return `<span class="hp-inline ${cls}" title="${tip}">${fmtHrs(h.real)}/${fmtHrs(h.est)}${over !== null ? ` (+${over}%)` : ''}</span>`; })() : ''}</div>
         <div class="l-cell">
           <div class="pbar-wrap">
             <div class="pbar-pct${dispProg >= 100 ? ' done' : ''}">${dispProg}%</div>
@@ -1671,7 +1671,7 @@ function renderHoursPanel() {
     return `<div class="hp-row">
       <div class="hp-row-head">
         <span class="hp-row-name" title="${esc(e.name)}">${esc(shortStageName(e.name))}${progChip}</span>
-        <span class="hp-row-fig">${fmtHrs(e.est)} est · <b class="${cls}">${fmtHrs(e.real)} real</b>${overPct !== null ? ` <b class="bad">+${overPct}% pasado</b>` : ''}</span>
+        <span class="hp-row-fig">${fmtHrs(e.est)} est · <b class="${cls}">${fmtHrs(e.real)} real</b>${overPct !== null ? ` <b class="bad">(+${overPct}%)</b>` : ''}</span>
       </div>
       <div class="hp-bar">
         <div class="hp-bar-est" style="width:${e.est / max * 100}%"></div>
