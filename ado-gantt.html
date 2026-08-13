@@ -1894,7 +1894,7 @@ function deltaBadge(e) {
   if (e.real === 0) return { text: '—', cls: 'flat' };
   const pct = Math.round((e.real - e.est) / e.est * 100);
   if (pct === 0) return { text: '0%', cls: 'flat' };
-  return { text: (pct > 0 ? '+' : '') + pct + '%', cls: pct > 0 ? 'over' : 'under' };
+  return { text: (pct > 0 ? '+' + pct : Math.abs(pct)) + '%', cls: pct > 0 ? 'over' : 'under' };
 }
 
 function toggleQuarterCollapse(q) {
