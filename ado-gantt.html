@@ -1127,6 +1127,11 @@ function renderHistory(transitions) {
     return;
   }
   const now = new Date();
+  // Si ya cerró, "hace N días desde que cerró" no aporta nada — lo que importa
+  // es cuánto llevó todo el ciclo (desde la primera transición hasta el cierre).
+  const isClosed = transitions[transitions.length - 1].state === 'Closed';
+  const totalCycle = isClosed ? (transitions[transitions.length - 1].date - transitions[0].date) : null;
+
   let html = '<div class="hist-timeline">';
   for (let i = 0; i < transitions.length; i++) {
     const t = transitions[i];
@@ -1134,12 +1139,20 @@ function renderHistory(transitions) {
     const end = next ? next.date : now;
     const isLast = i === transitions.length - 1;
     const isReopen = t.state === 'Reopen';
+    let durLine;
+    if (!isLast) {
+      durLine = `Duró <b>${fmtDur(end - t.date)}</b>`;
+    } else if (isClosed) {
+      durLine = `Tiempo total del ciclo <b>${fmtDur(totalCycle)}</b>`;
+    } else {
+      durLine = `En este estado hace <b>${fmtDur(end - t.date)}</b>`;
+    }
     html += `<div class="hist-item${isReopen ? ' reopen' : (isLast ? '' : ' done')}">
       <div class="hist-row">
         <span class="hist-state">${isReopen ? '↺ ' : ''}${esc(t.state)}</span>
         <span class="hist-date">${fmtDateTime(t.date)}</span>
       </div>
-      <div class="hist-dur">${isLast ? 'En este estado hace' : 'Duró'} <b>${fmtDur(end - t.date)}</b></div>
+      <div class="hist-dur">${durLine}</div>
     </div>`;
   }
   html += '</div>';
