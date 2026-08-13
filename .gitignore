@@ -3,3 +3,7 @@
 
 # Claude Code
 .claude/
+.agents/
+
+# Bot timereport (perfil de navegador, no es codigo del proyecto)
+.pw-profile-peoplehub/
