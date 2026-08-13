@@ -25,6 +25,17 @@ body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Robo
 .config-btn { background: #2563eb; color: white; border: none; padding: 12px 24px; border-radius: 10px; cursor: pointer; font-size: 14px; font-weight: 600; width: 100%; margin-top: 8px; transition: background .15s; box-shadow: 0 2px 6px rgba(37,99,235,.3); }
 .config-btn:hover { background: #1d4ed8; }
 
+.hg-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.hg-table th { text-align: left; font-weight: 600; color: #888; text-transform: uppercase; font-size: 10px; letter-spacing: .5px; padding: 4px 6px; border-bottom: 1px solid #e2e4e9; }
+.hg-table td { padding: 3px 4px; border-bottom: 1px solid #f0f1f3; }
+.hg-table input { width: 100%; padding: 6px 8px; border: 1px solid #e2e4e9; border-radius: 6px; font-size: 12px; box-sizing: border-box; }
+.hg-table input:focus { outline: none; border-color: #2563eb; }
+.hg-table td:nth-child(2) input, .hg-table td:nth-child(3) input, .hg-table td:nth-child(4) input { text-align: right; }
+.hg-delbtn { background: none; border: none; color: #b91c1c; cursor: pointer; font-size: 14px; padding: 2px 6px; }
+.hg-delbtn:hover { color: #7f1d1d; }
+.hg-addbtn { background: #f3f4f6; border: 1px solid #e2e4e9; color: #333; padding: 6px 12px; border-radius: 6px; font-size: 12px; cursor: pointer; margin-top: 8px; }
+.hg-addbtn:hover { background: #e9eaed; }
+
 /* ── Top bar ── */
 .topbar { background: white; border-bottom: 1px solid #e8eaed; padding: 11px 22px; display: flex; align-items: center; gap: 12px; position: sticky; top: 0; z-index: 100; box-shadow: 0 1px 3px rgba(16,24,40,.06); flex-wrap: wrap; }
 .brand { display: flex; align-items: center; gap: 9px; }
@@ -287,6 +298,7 @@ a.ititle:hover { color: #2563eb; text-decoration: underline; }
 .an-right { display: flex; align-items: center; justify-content: flex-end; gap: 12px; }
 .an-num { font-size: 18px; font-weight: 700; color: #111827; line-height: 1.15; text-align: right; font-variant-numeric: tabular-nums; }
 .an-sub { font-size: var(--text-meta); color: #9ca3af; margin-top: 2px; text-align: right; }
+.an-upgrade { font-size: var(--text-meta); color: var(--plan); margin-top: 2px; text-align: right; font-weight: 600; }
 .an-badge { font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 8px; white-space: nowrap; font-variant-numeric: tabular-nums; min-width: 56px; text-align: center; display: inline-block; }
 .an-badge.over  { background: var(--crit-soft); color: var(--crit); }
 .an-badge.under { background: var(--ok-soft); color: var(--ok); }
@@ -341,9 +353,21 @@ a.ititle:hover { color: #2563eb; text-decoration: underline; }
       <small>Si está completo, se usa en lugar de los sprints de ADO. Borrar para volver a ADO.</small>
     </div>
     <div class="config-field">
-      <label>Horas por etapa <span style="font-weight:400;text-transform:none">(pegá el reporte semanal: bloques "id - nombre" y "consumidas de estimadas")</span></label>
-      <textarea id="cfgHours" rows="6" style="width:100%;padding:8px 12px;border:1px solid #ddd;border-radius:6px;font-size:12px;font-family:monospace;resize:vertical" placeholder="121930 - ACCUSYS-PROBATCH NV-FASE 0-Core Estable&#10;645,5 de 360"></textarea>
-      <small>Coma decimal (645,5). Las líneas "Accusys" se ignoran. Se muestra en el panel de Horas y en las filas de Epic.</small>
+      <label>Horas por etapa <span style="font-weight:400;text-transform:none">(cargá o editá los datos a mano en la grilla)</span></label>
+      <table class="hg-table">
+        <thead>
+          <tr><th>Etapa</th><th>Consumidas</th><th>Estimadas</th><th>Adicionales</th><th></th></tr>
+        </thead>
+        <tbody id="hoursGridBody"></tbody>
+      </table>
+      <button type="button" class="hg-addbtn" onclick="addHoursRow()">+ Agregar etapa</button>
+      <small>"Adicionales" son horas de upgrade de alcance que se suman al estimado (se muestran como "ampliado" en Alto Nivel).</small>
+      <details style="margin-top:10px">
+        <summary style="cursor:pointer;font-size:12px;color:#666">Importar desde el reporte semanal pegado (opcional)</summary>
+        <textarea id="cfgHoursImport" rows="5" style="width:100%;margin-top:8px;padding:8px 12px;border:1px solid #ddd;border-radius:6px;font-size:12px;font-family:monospace;resize:vertical" placeholder="121930 - ACCUSYS-PROBATCH NV-FASE 0-Core Estable&#10;645,5 de 360"></textarea>
+        <button type="button" class="hg-addbtn" onclick="importHoursFromText()" style="margin-top:6px">Importar a la grilla →</button>
+        <small>Actualiza consumidas/estimadas de las etapas que coincidan por nombre y agrega las nuevas. No toca el campo "Adicionales" de las que ya existían.</small>
+      </details>
     </div>
     <button class="config-btn" onclick="saveConfig()">Cargar Gantt →</button>
   </div>
@@ -482,7 +506,9 @@ function saveConfig() {
     dayW: parseInt(document.getElementById('cfgDayW').value) || 28,
     maxItems: parseInt(document.getElementById('cfgMax').value) || 500,
     manualSprints: document.getElementById('cfgSprints').value,
-    hoursText: document.getElementById('cfgHours').value,
+    hoursRows: hoursRowsDraft
+      .filter(r => r.name && r.name.trim())
+      .map(r => ({ name: r.name.trim(), real: parseNum(r.real), est: parseNum(r.est), upgrade: parseNum(r.upgrade) })),
   };
   localStorage.setItem('adoGanttCfg2', JSON.stringify(cfg));
   document.getElementById('configOverlay').style.display = 'none';
@@ -497,7 +523,8 @@ function showConfig() {
   document.getElementById('cfgDayW').value = cfg.dayW || 28;
   document.getElementById('cfgMax').value = cfg.maxItems || 500;
   document.getElementById('cfgSprints').value = cfg.manualSprints !== undefined ? cfg.manualSprints : MANUAL_SPRINTS_DEFAULT;
-  document.getElementById('cfgHours').value = cfg.hoursText || '';
+  hoursRowsDraft = (cfg.hoursRows || []).map(r => ({ ...r }));
+  renderHoursGrid();
   document.getElementById('configOverlay').style.display = 'flex';
 }
 
@@ -1739,7 +1766,47 @@ function setActiveTab(tab) {
   updateTopbarH();
 }
 
-function parseNum(s) { return parseFloat(String(s).replace(/\./g, '').replace(',', '.')) || 0; }
+function parseNum(s) {
+  if (typeof s === 'number') return s; // ya es un número (ej: viene de un import previo), no re-parsear
+  return parseFloat(String(s).replace(/\./g, '').replace(',', '.')) || 0;
+}
+
+// ─── Grilla de horas por etapa (edición manual en Config) ────────────────────
+let hoursRowsDraft = []; // [{name, real, est, upgrade}] — estado en edición del modal
+
+function renderHoursGrid() {
+  const body = document.getElementById('hoursGridBody');
+  if (!body) return;
+  body.innerHTML = hoursRowsDraft.map((r, i) => `
+    <tr>
+      <td><input type="text" value="${esc(r.name || '')}" oninput="hoursRowsDraft[${i}].name=this.value" placeholder="Nombre de la etapa" /></td>
+      <td><input type="text" value="${esc(r.real ?? '')}" oninput="hoursRowsDraft[${i}].real=this.value" placeholder="0" /></td>
+      <td><input type="text" value="${esc(r.est ?? '')}" oninput="hoursRowsDraft[${i}].est=this.value" placeholder="0" /></td>
+      <td><input type="text" value="${esc(r.upgrade ?? '')}" oninput="hoursRowsDraft[${i}].upgrade=this.value" placeholder="0" /></td>
+      <td><button type="button" class="hg-delbtn" onclick="removeHoursRow(${i})" title="Eliminar etapa">✕</button></td>
+    </tr>`).join('');
+}
+function addHoursRow() {
+  hoursRowsDraft.push({ name: '', real: '', est: '', upgrade: '' });
+  renderHoursGrid();
+}
+function removeHoursRow(i) {
+  hoursRowsDraft.splice(i, 1);
+  renderHoursGrid();
+}
+// Importa el reporte pegado: actualiza consumidas/estimadas de etapas existentes
+// (por coincidencia exacta de nombre, sin importar mayúsculas) y agrega las nuevas.
+// No toca el campo "Adicionales" de las etapas que ya estaban.
+function importHoursFromText() {
+  const text = document.getElementById('cfgHoursImport').value;
+  const parsed = parseHours(text);
+  for (const e of parsed) {
+    const existing = hoursRowsDraft.find(r => (r.name || '').trim().toLowerCase() === e.name.trim().toLowerCase());
+    if (existing) { existing.real = e.real; existing.est = e.est; }
+    else hoursRowsDraft.push({ name: e.name, real: e.real, est: e.est, upgrade: '' });
+  }
+  renderHoursGrid();
+}
 
 // Parsea el bloque pegado: líneas "id - nombre" seguidas de "consumidas de estimadas"
 function parseHours(text) {
@@ -1952,6 +2019,7 @@ function renderAltoNivel() {
           <div>
             <div class="an-num">${fmtHrs(e.real)} / ${fmtHrs(e.est)}</div>
             <div class="an-sub">horas totales${m.projection != null ? ` · proyección ${fmtHrs(m.projection)}` : ''}</div>
+            ${e.upgradeHours ? `<div class="an-upgrade" title="Estimado ampliado de ${fmtHrs(e.est - e.upgradeHours)} a ${fmtHrs(e.est)} hs">↑ ampliado +${fmtHrs(e.upgradeHours)} hs</div>` : ''}
           </div>
           ${badge ? `<span class="an-badge ${badge.cls}">${badge.text}</span>` : ''}
         </div>
@@ -2033,7 +2101,10 @@ function setTimeAxis(mode) {
 
 // Re-parsea las horas, las asocia a Epics y refresca el panel
 function refreshHours() {
-  hoursData = parseHours(cfg.hoursText);
+  hoursData = (cfg.hoursRows || []).filter(r => r.name).map(r => {
+    const upgradeHours = r.upgrade || 0;
+    return { extId: null, name: r.name, real: r.real || 0, est: (r.est || 0) + upgradeHours, upgradeHours };
+  });
   matchHoursToEpics();
   if (activeTab === 'alto-nivel') renderAltoNivel();
 }
