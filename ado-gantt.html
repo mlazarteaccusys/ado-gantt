@@ -284,10 +284,6 @@ a.ititle:hover { color: #2563eb; text-decoration: underline; }
 .an-gasto { color: #9ca3af; white-space: nowrap; font-size: var(--text-meta); }
 .an-bar { position: relative; height: 10px; background: var(--track); border-radius: 5px; }
 .an-bar-fill { position: absolute; left: 0; top: 0; height: 100%; background: var(--plan); border-radius: 5px; }
-/* Marcador de gasto: único color con significado de salud (ok=dentro, near=cerca, over=excedido) */
-.an-bar-marker { position: absolute; top: -4px; bottom: -4px; width: 4px; border-radius: 1px; background: var(--ok); }
-.an-bar-marker.near { background: var(--warn); }
-.an-bar-marker.over { background: var(--crit); }
 .an-counts { margin-top: 8px; font-size: var(--text-meta); color: #9ca3af; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 .an-right { display: flex; align-items: center; justify-content: flex-end; gap: 12px; }
 .an-num { font-size: 18px; font-weight: 700; color: #111827; line-height: 1.15; text-align: right; font-variant-numeric: tabular-nums; }
@@ -1848,7 +1844,7 @@ const Q_RULES = [
   { q: 'Q3', match: /fase\s*4|new\s*ejecutor|planificador/i },
   { q: 'Q4', match: /configuraci/i },
 ];
-const Q_LABEL = { Q1: 'Q1 · Core Estable', Q2: 'Q2 · Fase 2 + New Look and Feel', Q3: 'Q3 · Fase 4 + New Ejecutor + Planificador', Q4: 'Q4 · Configuración', '—': 'Sin trimestre asignado' };
+const Q_LABEL = { Q1: 'Q1 · Core Estable', Q2: 'Q2 · Anticipación Predictiva + New Look and Feel', Q3: 'Q3 · Asistencia Operativa + New Ejecutor + Planificador', Q4: 'Q4 · Configuración', '—': 'Sin trimestre asignado' };
 
 function stageQuarter(e) {
   for (const r of Q_RULES) if (r.match.test(e.name || '')) return r.q;
@@ -1925,7 +1921,6 @@ function renderAltoNivel() {
     const m = stageMetrics(e);
     const badge = deltaBadge(e);
     const fillPct = m.avance != null ? Math.min(100, m.avance) : 0;
-    const markerPct = m.gasto != null ? Math.min(100, m.gasto) : null;
     const avLblCls = m.notStarted ? 'zero' : (m.avance >= 100 ? 'done' : 'wip');
     const statusTxt = m.notStarted ? '' : (m.status === 'over' ? 'Sobre presupuesto' : (m.status === 'near' ? 'Cerca del límite' : ''));
     let countsHtml = '';
@@ -1952,7 +1947,6 @@ function renderAltoNivel() {
           </div>
           <div class="an-bar">
             <div class="an-bar-fill${m.avance >= 100 ? ' done' : ''}" style="width:${fillPct}%"></div>
-            ${markerPct != null && e.real > 0 ? `<div class="an-bar-marker${m.status ? ' ' + m.status : ''}" style="left:${markerPct}%" title="${Math.round(m.gasto)}% gasto"></div>` : ''}
           </div>
           ${countsHtml}
         </div>
@@ -2009,7 +2003,7 @@ function renderAltoNivel() {
       </div>
       ${qHtml}
       <div class="an-footer">
-        <span><span class="sw" style="background:var(--plan)"></span>avance<span class="sw" style="background:#9ca3af"></span>gasto (color = salud)</span>
+        <span><span class="sw" style="background:var(--plan)"></span>avance (% de progreso del proyecto)</span>
         <span>ef = avance% ÷ consumo% · 1.00 significa avanzar al ritmo planificado</span>
       </div>
     </div>`;
