@@ -523,7 +523,11 @@ function showConfig() {
   document.getElementById('cfgDayW').value = cfg.dayW || 28;
   document.getElementById('cfgMax').value = cfg.maxItems || 500;
   document.getElementById('cfgSprints').value = cfg.manualSprints !== undefined ? cfg.manualSprints : MANUAL_SPRINTS_DEFAULT;
-  hoursRowsDraft = (cfg.hoursRows || []).map(r => ({ ...r }));
+  // Migración: si nunca se guardó la grilla pero sí hay un reporte viejo pegado, precargarla desde ahí.
+  const legacyRows = (!cfg.hoursRows || !cfg.hoursRows.length) && cfg.hoursText
+    ? parseHours(cfg.hoursText).map(e => ({ name: e.name, real: e.real, est: e.est, upgrade: '' }))
+    : null;
+  hoursRowsDraft = (legacyRows || cfg.hoursRows || []).map(r => ({ ...r }));
   renderHoursGrid();
   document.getElementById('configOverlay').style.display = 'flex';
 }
@@ -2101,7 +2105,12 @@ function setTimeAxis(mode) {
 
 // Re-parsea las horas, las asocia a Epics y refresca el panel
 function refreshHours() {
-  hoursData = (cfg.hoursRows || []).filter(r => r.name).map(r => {
+  // Compatibilidad: si todavía no se guardó la grilla nueva pero hay un reporte
+  // viejo pegado (cfg.hoursText, de antes de la grilla), usarlo hasta que se guarde Config.
+  const rows = (cfg.hoursRows && cfg.hoursRows.length) ? cfg.hoursRows
+    : cfg.hoursText ? parseHours(cfg.hoursText).map(e => ({ name: e.name, real: e.real, est: e.est, upgrade: 0 }))
+    : [];
+  hoursData = rows.filter(r => r.name).map(r => {
     const upgradeHours = r.upgrade || 0;
     return { extId: null, name: r.name, real: r.real || 0, est: (r.est || 0) + upgradeHours, upgradeHours };
   });
