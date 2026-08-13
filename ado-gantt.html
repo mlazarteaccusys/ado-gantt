@@ -281,7 +281,6 @@ a.ititle:hover { color: #2563eb; text-decoration: underline; }
 .an-avance-lbl.zero { color: #9ca3af; }
 .an-status { font-weight: 700; margin-left: 8px; font-size: var(--text-meta); }
 .an-status.over { color: var(--crit); } .an-status.near { color: var(--warn); } .an-status.none { color: #9ca3af; }
-.an-gasto { color: #9ca3af; white-space: nowrap; font-size: var(--text-meta); }
 .an-bar { position: relative; height: 10px; background: var(--track); border-radius: 5px; }
 .an-bar-fill { position: absolute; left: 0; top: 0; height: 100%; background: var(--plan); border-radius: 5px; }
 .an-counts { margin-top: 8px; font-size: var(--text-meta); color: #9ca3af; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
@@ -1943,7 +1942,6 @@ function renderAltoNivel() {
         <div class="an-left">
           <div class="an-toprow">
             <span><span class="an-avance-lbl ${avLblCls}">${m.notStarted ? 'Sin iniciar' : (m.avance ?? 0) + '% avance'}</span>${statusTxt ? `<span class="an-status ${m.status}">${statusTxt}</span>` : ''}</span>
-            <span class="an-gasto">${m.gasto != null ? Math.round(m.gasto) + '% gasto' : ''}</span>
           </div>
           <div class="an-bar">
             <div class="an-bar-fill${m.avance >= 100 ? ' done' : ''}" style="width:${fillPct}%"></div>
