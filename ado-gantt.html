@@ -150,6 +150,8 @@ a.ititle:hover { color: #2563eb; text-decoration: underline; }
 .hist-item::after { content: ''; position: absolute; left: 7px; top: 14px; bottom: 0; width: 2px; background: #e5e7eb; }
 .hist-item:last-child::after { display: none; }
 .hist-item.done::before { background: #16a34a; }
+.hist-item.reopen::before { background: #d97706; }
+.hist-item.reopen .hist-state { color: #b45309; }
 .hist-row { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
 .hist-state { font-size: 13px; font-weight: 700; color: #1f2937; }
 .hist-arrow { font-weight: 400; color: #9ca3af; margin: 0 5px; }
@@ -1079,10 +1081,21 @@ function closeHistory() {
 }
 
 // Trae los cambios de System.State del work item, en orden cronológico
+// Solo estas transiciones importan para el historial: el resto (New, Ready for
+// dev, Análisis, Diseño Técnico, etc.) es ruido para esta vista.
+function historyRelevantState(rawState) {
+  const l = (rawState || '').toLowerCase();
+  if (/reopen/.test(l)) return 'Reopen';
+  if (/code review/.test(l)) return 'Code Review';
+  if (/\b(done|closed|resolved|completed)\b/.test(l)) return 'Closed';
+  if (/in[\s-]?progress/.test(l)) return 'In Progress';
+  return null;
+}
+
 async function fetchStateHistory(id) {
   const url = `${base()}/_apis/wit/workitems/${id}/updates?api-version=7.1`;
   const d = await apiGet(url);
-  const out = [];
+  const raw = [];
   for (const u of (d.value || [])) {
     const f = u.fields || {};
     if (!f['System.State']) continue;
@@ -1091,16 +1104,26 @@ async function fetchStateHistory(id) {
                      (f['System.AuthorizedDate'] && f['System.AuthorizedDate'].newValue);
     const date = dateStr ? new Date(dateStr) : null;
     if (!date) continue;
-    out.push({ state: f['System.State'].newValue, date });
+    raw.push({ state: f['System.State'].newValue, date });
   }
-  out.sort((a, b) => a.date - b.date);
+  raw.sort((a, b) => a.date - b.date);
+
+  // Nos quedamos solo con Reopen / In Progress / Code Review / Closed,
+  // colapsando repeticiones consecutivas del mismo bucket.
+  const out = [];
+  for (const r of raw) {
+    const bucket = historyRelevantState(r.state);
+    if (!bucket) continue;
+    if (out.length && out[out.length - 1].state === bucket) continue;
+    out.push({ state: bucket, date: r.date });
+  }
   return out;
 }
 
 function renderHistory(transitions) {
   const body = document.getElementById('histBody');
   if (!transitions.length) {
-    body.innerHTML = `<div class="hist-loading">Sin cambios de estado registrados.</div>`;
+    body.innerHTML = `<div class="hist-loading">Todavía no pasó por In Progress, Code Review, Reopen ni Closed.</div>`;
     return;
   }
   const now = new Date();
@@ -1110,9 +1133,10 @@ function renderHistory(transitions) {
     const next = transitions[i + 1];
     const end = next ? next.date : now;
     const isLast = i === transitions.length - 1;
-    html += `<div class="hist-item${isLast ? '' : ' done'}">
+    const isReopen = t.state === 'Reopen';
+    html += `<div class="hist-item${isReopen ? ' reopen' : (isLast ? '' : ' done')}">
       <div class="hist-row">
-        <span class="hist-state">${esc(t.state)}</span>
+        <span class="hist-state">${isReopen ? '↺ ' : ''}${esc(t.state)}</span>
         <span class="hist-date">${fmtDateTime(t.date)}</span>
       </div>
       <div class="hist-dur">${isLast ? 'En este estado hace' : 'Duró'} <b>${fmtDur(end - t.date)}</b></div>
@@ -1287,7 +1311,7 @@ function render() {
             ${cbtn}
             <span class="iicon">${typeIcon(item.type)}</span>
             <a class="ititle" href="${wiUrl(item.id)}" target="_blank" rel="noopener" title="${esc(item.title)} — abrir #${item.id} en Azure DevOps">${esc(item.title)}</a>
-            <button class="info-btn" onclick="event.stopPropagation(); showHistory(${item.id}, '${esc(item.title).replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/[\r\n]/g, ' ')}')" title="Ver historial de estados">ⓘ</button>
+            ${item.type !== 'Epic' && item.type !== 'Feature' ? `<button class="info-btn" onclick="event.stopPropagation(); showHistory(${item.id}, '${esc(item.title).replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/[\r\n]/g, ' ')}')" title="Ver historial de estados">ⓘ</button>` : ''}
           </div>
         </div>
         <div class="l-cell"><span class="sbadge ${statusCls(dispState)}">${esc(dispState)}</span></div>
