@@ -1287,7 +1287,7 @@ function render() {
             ${cbtn}
             <span class="iicon">${typeIcon(item.type)}</span>
             <a class="ititle" href="${wiUrl(item.id)}" target="_blank" rel="noopener" title="${esc(item.title)} — abrir #${item.id} en Azure DevOps">${esc(item.title)}</a>
-            <button class="info-btn" onclick="event.stopPropagation(); showHistory(${item.id}, '${esc(item.title).replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/[\r\n]/g, ' ')}')" title="Ver historial de estados">ⓘ</button>
+            ${item.type !== 'Epic' && item.type !== 'Feature' ? `<button class="info-btn" onclick="event.stopPropagation(); showHistory(${item.id}, '${esc(item.title).replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/[\r\n]/g, ' ')}')" title="Ver historial de estados">ⓘ</button>` : ''}
           </div>
         </div>
         <div class="l-cell"><span class="sbadge ${statusCls(dispState)}">${esc(dispState)}</span></div>
