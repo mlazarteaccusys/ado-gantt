@@ -287,7 +287,6 @@ a.ititle:hover { color: #2563eb; text-decoration: underline; }
 .an-right { display: flex; align-items: center; justify-content: flex-end; gap: 12px; }
 .an-num { font-size: 18px; font-weight: 700; color: #111827; line-height: 1.15; text-align: right; font-variant-numeric: tabular-nums; }
 .an-sub { font-size: var(--text-meta); color: #9ca3af; margin-top: 2px; text-align: right; }
-.an-upgrade { font-size: var(--text-meta); color: var(--plan); margin-top: 2px; text-align: right; font-weight: 600; }
 .an-badge { font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 8px; white-space: nowrap; font-variant-numeric: tabular-nums; min-width: 56px; text-align: center; display: inline-block; }
 .an-badge.over  { background: var(--crit-soft); color: var(--crit); }
 .an-badge.under { background: var(--ok-soft); color: var(--ok); }
@@ -345,11 +344,6 @@ a.ititle:hover { color: #2563eb; text-decoration: underline; }
       <label>Horas por etapa <span style="font-weight:400;text-transform:none">(pegá el reporte semanal: bloques "id - nombre" y "consumidas de estimadas")</span></label>
       <textarea id="cfgHours" rows="6" style="width:100%;padding:8px 12px;border:1px solid #ddd;border-radius:6px;font-size:12px;font-family:monospace;resize:vertical" placeholder="121930 - ACCUSYS-PROBATCH NV-FASE 0-Core Estable&#10;645,5 de 360"></textarea>
       <small>Coma decimal (645,5). Las líneas "Accusys" se ignoran. Se muestra en el panel de Horas y en las filas de Epic.</small>
-    </div>
-    <div class="config-field">
-      <label>Horas adicionales <span style="font-weight:400;text-transform:none">(upgrades de alcance — formato: texto a buscar en el nombre de la etapa,horas — uno por línea)</span></label>
-      <textarea id="cfgUpgrades" rows="3" style="width:100%;padding:8px 12px;border:1px solid #ddd;border-radius:6px;font-size:12px;font-family:monospace;resize:vertical" placeholder="Fase 4,384&#10;New Ejecutor,432"></textarea>
-      <small>Se suma al estimado de cualquier etapa cuyo nombre contenga ese texto (sin importar mayúsculas). Se muestra como "ampliado +N hs" en Alto Nivel.</small>
     </div>
     <button class="config-btn" onclick="saveConfig()">Cargar Gantt →</button>
   </div>
@@ -489,7 +483,6 @@ function saveConfig() {
     maxItems: parseInt(document.getElementById('cfgMax').value) || 500,
     manualSprints: document.getElementById('cfgSprints').value,
     hoursText: document.getElementById('cfgHours').value,
-    hoursUpgrades: document.getElementById('cfgUpgrades').value,
   };
   localStorage.setItem('adoGanttCfg2', JSON.stringify(cfg));
   document.getElementById('configOverlay').style.display = 'none';
@@ -505,7 +498,6 @@ function showConfig() {
   document.getElementById('cfgMax').value = cfg.maxItems || 500;
   document.getElementById('cfgSprints').value = cfg.manualSprints !== undefined ? cfg.manualSprints : MANUAL_SPRINTS_DEFAULT;
   document.getElementById('cfgHours').value = cfg.hoursText || '';
-  document.getElementById('cfgUpgrades').value = cfg.hoursUpgrades || '';
   document.getElementById('configOverlay').style.display = 'flex';
 }
 
@@ -1769,33 +1761,6 @@ function parseHours(text) {
   return out.filter(e => e.est || e.real);
 }
 
-// Upgrades de alcance: horas adicionales que se suman al estimado de una etapa
-// según coincidencia de texto en su nombre (ej: "Fase 4,384" -> +384hs a toda
-// etapa cuyo nombre contenga "Fase 4"). Formato: "texto,horas" por línea.
-function parseUpgrades(text) {
-  const out = [];
-  for (const line of String(text || '').split('\n')) {
-    const m = line.match(/^(.+),\s*([\d.,]+)\s*$/);
-    if (!m) continue;
-    const match = m[1].trim();
-    const hours = parseNum(m[2]);
-    if (match && hours) out.push({ match, hours });
-  }
-  return out;
-}
-
-// Aplica los upgrades al estimado de cada etapa (acumulativo si matchean varias reglas)
-function applyUpgrades(entries, upgrades) {
-  for (const e of entries) {
-    let added = 0;
-    for (const u of upgrades) {
-      if (e.name.toLowerCase().includes(u.match.toLowerCase())) added += u.hours;
-    }
-    e.upgradeHours = added;
-    if (added) e.est += added;
-  }
-}
-
 // Tokens normalizados para matchear nombres de etapa con las Epics del árbol
 function normTokens(s) {
   return String(s || '').toUpperCase()
@@ -1987,7 +1952,6 @@ function renderAltoNivel() {
           <div>
             <div class="an-num">${fmtHrs(e.real)} / ${fmtHrs(e.est)}</div>
             <div class="an-sub">horas totales${m.projection != null ? ` · proyección ${fmtHrs(m.projection)}` : ''}</div>
-            ${e.upgradeHours ? `<div class="an-upgrade" title="Estimado ampliado de ${fmtHrs(e.est - e.upgradeHours)} a ${fmtHrs(e.est)} hs">↑ ampliado +${fmtHrs(e.upgradeHours)} hs</div>` : ''}
           </div>
           ${badge ? `<span class="an-badge ${badge.cls}">${badge.text}</span>` : ''}
         </div>
@@ -2070,7 +2034,6 @@ function setTimeAxis(mode) {
 // Re-parsea las horas, las asocia a Epics y refresca el panel
 function refreshHours() {
   hoursData = parseHours(cfg.hoursText);
-  applyUpgrades(hoursData, parseUpgrades(cfg.hoursUpgrades));
   matchHoursToEpics();
   if (activeTab === 'alto-nivel') renderAltoNivel();
 }
