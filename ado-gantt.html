@@ -136,7 +136,9 @@ body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Robo
 .cbtn { background: none; border: none; cursor: pointer; font-size: 9px; color: #999; width: 14px; flex-shrink: 0; line-height: 1; }
 .cbtn:hover { color: #333; }
 .iicon { font-size: 13px; flex-shrink: 0; }
+.qdot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; display: inline-block; }
 .ititle { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: inherit; text-decoration: none; cursor: pointer; }
+.qname-row { font-weight: 700; cursor: default; }
 a.ititle:hover { color: #2563eb; text-decoration: underline; }
 .info-btn { background: none; border: none; cursor: pointer; font-size: 12px; color: #b0b6c0; flex-shrink: 0; line-height: 1; padding: 2px; border-radius: 50%; }
 .info-btn:hover { color: #2563eb; background: #eff6ff; }
@@ -282,7 +284,6 @@ a.ititle:hover { color: #2563eb; text-decoration: underline; }
 .an-gasto { color: #9ca3af; white-space: nowrap; font-size: var(--text-meta); }
 .an-bar { position: relative; height: 10px; background: var(--track); border-radius: 5px; }
 .an-bar-fill { position: absolute; left: 0; top: 0; height: 100%; background: var(--plan); border-radius: 5px; }
-.an-bar-ref { position: absolute; top: -3px; bottom: -3px; width: 1px; background: rgba(17,24,39,.35); }
 /* Marcador de gasto: único color con significado de salud (ok=dentro, near=cerca, over=excedido) */
 .an-bar-marker { position: absolute; top: -4px; bottom: -4px; width: 4px; border-radius: 1px; background: var(--ok); }
 .an-bar-marker.near { background: var(--warn); }
@@ -591,6 +592,7 @@ async function onTeamChange(teamName) {
     workItems = processItems(raw, iters);
     buildFullTree();
     refreshHours();
+    applyQuarterLevel();
     buildStateMenu();
     const ts = new Date().toLocaleTimeString('es', { hour:'2-digit', minute:'2-digit' });
     document.getElementById('lastUpdate').textContent = `↻ ${ts} · ${workItems.length} items · ${iters.length} sprints`;
@@ -963,6 +965,66 @@ function buildFullTree() {
   collapseAll(fullTree);
 }
 
+// Nivel de Trimestre (Q1-Q4): agrupa las Epics/Improvements raíz según a qué
+// etapa del reporte de horas pertenecen (misma asignación epicId → etapa que
+// usa el tab Alto Nivel). Se aplica después de refreshHours(), que es quien
+// llena hoursByEpic. Los roots sin etapa mapeada quedan fuera de cualquier Q.
+function applyQuarterLevel() {
+  const qBuckets = {};
+  const noQuarter = [];
+  for (const root of fullTree) {
+    if (root.type === 'Quarter') continue; // ya envuelto (no debería pasar, pero por seguridad)
+    const stageEntry = hoursByEpic[root.id];
+    const q = stageEntry ? stageQuarter(stageEntry) : epicQuarter(root.title);
+    if (q) (qBuckets[q] = qBuckets[q] || []).push(root);
+    else noQuarter.push(root);
+  }
+  const qKeys = ['Q1', 'Q2', 'Q3', 'Q4'].filter(q => qBuckets[q]);
+  if (!qKeys.length) return;
+  const qNodes = qKeys.map((q, i) => {
+    const kids = qBuckets[q];
+    const starts = kids.map(k => k.startDate).filter(Boolean);
+    const ends = kids.map(k => k.endDate).filter(Boolean);
+    const qn = {
+      id: -1000 - i, // id sintético: nunca colisiona con un ID real de ADO (siempre positivo)
+      title: (Q_LABEL[q] || q).replace(/^Q\d\s*·\s*/, ''),
+      type: 'Quarter', qKey: q, state: '', iterPath: '', iter: null,
+      assignee: '', priority: 0, tags: '',
+      hasExplicitDates: !!(starts.length && ends.length),
+      startDate: starts.length ? new Date(Math.min(...starts.map(d => d.getTime()))) : null,
+      endDate: ends.length ? new Date(Math.max(...ends.map(d => d.getTime()))) : null,
+      children: kids,
+    };
+    qn.progress = calcProgress(qn);
+    return qn;
+  });
+  fullTree = [...qNodes, ...noQuarter];
+  for (const qn of qNodes) collapsed.add(qn.id);
+}
+
+// A qué trimestre pertenece una Epic, según su título (mismas reglas que Q_RULES).
+// Fallback cuando la Epic no tiene una etapa de horas asociada (hoursByEpic).
+function epicQuarter(title) {
+  for (const r of Q_RULES) if (r.match.test(title || '')) return r.q;
+  return null;
+}
+// ¿Algún descendiente tiene desvío de fecha activo? (mismo criterio que la franja roja del Gantt)
+function hasSlippage(node) {
+  if (node.hasExplicitDates && node._maxDescEnd && node.endDate && node._maxDescEnd > node.endDate.getTime()) {
+    if (businessDaysBetween(node.endDate, new Date(node._maxDescEnd)) > 0) return true;
+  }
+  for (const c of (node.children || [])) if (hasSlippage(c)) return true;
+  return false;
+}
+// Color de salud del trimestre: gris sin iniciar, verde completo, rojo con desvío de fecha, azul en curso
+function quarterHealthColor(qNode) {
+  const p = qNode.progress || 0;
+  if (p <= 0) return '#9ca3af';
+  if (p >= 100) return '#16a34a';
+  if (hasSlippage(qNode)) return '#dc2626';
+  return '#2563eb';
+}
+
 // ─── Días hábiles (Argentina) ────────────────────────────────────────────────
 // Feriados nacionales. Editable: agregá/quitá fechas 'YYYY-MM-DD' según corresponda
 // (los "feriados puente"/no laborables se declaran cada año y no están incluidos).
@@ -1024,7 +1086,7 @@ function businessDaysBetween(from, to) {
 function flatten(nodes, depth = 0) {
   const out = [];
   for (const n of nodes) {
-    const show = activeTypes.has(n.type) && stateVisible(n);
+    const show = n.type === 'Quarter' ? true : (activeTypes.has(n.type) && stateVisible(n));
     // Contar hijos visibles (para saber si mostrar botón de colapsar)
     const hasVisibleKids = n.children.length > 0;
     if (show) {
@@ -1320,24 +1382,36 @@ function render() {
       ? `<button class="cbtn" onclick="toggleCol(${item.id})">${isCol ? '▶' : '▼'}</button>`
       : '<span style="width:14px;flex-shrink:0;display:inline-block"></span>';
 
-    const tipText = `${item.type} #${item.id}\n${item.title}\nEstado: ${item.state}\nIterPath: ${item.iterPath}\nSprint: ${item.iter ? item.iter.name : '(no mapeado)'}\nAsignado: ${item.assignee||'—'}\nProgreso: ${item.progress}%`;
+    const isQuarter = item.type === 'Quarter';
+    const qColor = isQuarter ? quarterHealthColor(item) : null;
+    const tipText = isQuarter
+      ? `${item.title}\n${item.children.length} etapa(s)\nAvance: ${item.progress}%`
+      : `${item.type} #${item.id}\n${item.title}\nEstado: ${item.state}\nIterPath: ${item.iterPath}\nSprint: ${item.iter ? item.iter.name : '(no mapeado)'}\nAsignado: ${item.assignee||'—'}\nProgreso: ${item.progress}%`;
+
+    const iconHtml = isQuarter
+      ? `<span class="qdot" style="background:${qColor}" title="Avance ${item.progress}%"></span>`
+      : `<span class="iicon">${typeIcon(item.type)}</span>`;
+    const nameHtml = isQuarter
+      ? `<span class="ititle qname-row" title="${esc(item.title)}">${esc(item.title)}</span>`
+      : `<a class="ititle" href="${wiUrl(item.id)}" target="_blank" rel="noopener" title="${esc(item.title)} — abrir #${item.id} en Azure DevOps">${esc(item.title)}</a>`;
+    const estadoHtml = isQuarter ? '' : `<span class="sbadge ${statusCls(dispState)}">${esc(dispState)}</span>`;
 
     leftRows += `
       <div class="l-row" data-id="${item.id}">
         <div class="l-cell" style="padding-left:${pad}px">
           <div class="item-name">
             ${cbtn}
-            <span class="iicon">${typeIcon(item.type)}</span>
-            <a class="ititle" href="${wiUrl(item.id)}" target="_blank" rel="noopener" title="${esc(item.title)} — abrir #${item.id} en Azure DevOps">${esc(item.title)}</a>
-            ${item.type !== 'Epic' && item.type !== 'Feature' ? `<button class="info-btn" onclick="event.stopPropagation(); showHistory(${item.id}, '${esc(item.title).replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/[\r\n]/g, ' ')}')" title="Ver historial de estados">ⓘ</button>` : ''}
+            ${iconHtml}
+            ${nameHtml}
+            ${!isQuarter && item.type !== 'Epic' && item.type !== 'Feature' ? `<button class="info-btn" onclick="event.stopPropagation(); showHistory(${item.id}, '${esc(item.title).replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/[\r\n]/g, ' ')}')" title="Ver historial de estados">ⓘ</button>` : ''}
           </div>
         </div>
-        <div class="l-cell"><span class="sbadge ${statusCls(dispState)}">${esc(dispState)}</span></div>
+        <div class="l-cell">${estadoHtml}</div>
         <div class="l-cell">${hoursByEpic[item.id] ? (() => { const h = hoursByEpic[item.id]; const cls = hoursClass(h.real, h.est); const over = (h.est && h.real > h.est) ? Math.round((h.real - h.est) / h.est * 100) : null; const tip = `${fmtHrs(h.real)} consumidas de ${fmtHrs(h.est)} estimadas` + (over !== null ? ` — ${over}% por encima de lo estimado` : ' — dentro de lo estimado'); return `<span class="hp-inline ${cls}" title="${tip}">${fmtHrs(h.real)}/${fmtHrs(h.est)}${over !== null ? ` (+${over}%)` : ''}</span>`; })() : ''}</div>
         <div class="l-cell">
           <div class="pbar-wrap">
             <div class="pbar-pct${dispProg >= 100 ? ' done' : ''}">${dispProg}%</div>
-            <div class="pbar"><div class="pbar-fill ${dispProg >= 100 ? 'pf-done' : pfCls(item.type)}" style="width:${dispProg}%"></div></div>
+            <div class="pbar"><div class="pbar-fill ${dispProg >= 100 ? 'pf-done' : pfCls(item.type)}" style="width:${dispProg}%${isQuarter ? `;background:${qColor}` : ''}"></div></div>
           </div>
         </div>
         <div class="l-cell" style="font-size:11px;color:#777">${fmtD(item.startDate)} – ${fmtD(item.endDate)}</div>
@@ -1351,14 +1425,21 @@ function render() {
       const w = Math.max(px(barDays), 6);
       const progW = w * item.progress / 100;
       const dashedStyle = item.hasExplicitDates ? '' : 'opacity:0.75;';
-      barHtml = `<div class="gbar ${barCls(item.type)}" style="left:${left}px;width:${w}px;${dashedStyle}"
-        onclick="window.open(wiUrl(${item.id}),'_blank','noopener')"
-        onmouseenter="showTip(event,'${esc(tipText).replace(/\n/g,'&#10;')}')" onmouseleave="hideTip()">
-        <div class="gbar-prog" style="width:${progW}px"></div>
-        <span class="gbar-lbl">${esc(item.title)}</span>
-      </div>`;
+      if (isQuarter) {
+        barHtml = `<div class="gbar" style="left:${left}px;width:${w}px;background:${qColor};opacity:0.85"
+          onmouseenter="showTip(event,'${esc(tipText).replace(/\n/g,'&#10;')}')" onmouseleave="hideTip()">
+          <span class="gbar-lbl">${esc(item.title)} — ${item.progress}%</span>
+        </div>`;
+      } else {
+        barHtml = `<div class="gbar ${barCls(item.type)}" style="left:${left}px;width:${w}px;${dashedStyle}"
+          onclick="window.open(wiUrl(${item.id}),'_blank','noopener')"
+          onmouseenter="showTip(event,'${esc(tipText).replace(/\n/g,'&#10;')}')" onmouseleave="hideTip()">
+          <div class="gbar-prog" style="width:${progW}px"></div>
+          <span class="gbar-lbl">${esc(item.title)}</span>
+        </div>`;
+      }
       // Desvío: si los hijos reales terminan después de la fecha planificada
-      if (item.hasExplicitDates && item._maxDescEnd && item.endDate && item._maxDescEnd > item.endDate.getTime()) {
+      if (!isQuarter && item.hasExplicitDates && item._maxDescEnd && item.endDate && item._maxDescEnd > item.endDate.getTime()) {
         const realEnd = new Date(item._maxDescEnd);
         const slipDays = businessDaysBetween(item.endDate, realEnd); // días hábiles (AR)
         if (slipDays > 0) {
@@ -1843,10 +1924,8 @@ function renderAltoNivel() {
   function rowHtml(e) {
     const m = stageMetrics(e);
     const badge = deltaBadge(e);
-    const scale = Math.max(120, (m.gasto || 0) + 20, (m.avance || 0) + 20);
-    const fillPct = m.avance != null ? Math.min(100, m.avance / scale * 100) : 0;
-    const refPct = 100 / scale * 100;
-    const markerPct = m.gasto != null ? Math.min(100, m.gasto / scale * 100) : null;
+    const fillPct = m.avance != null ? Math.min(100, m.avance) : 0;
+    const markerPct = m.gasto != null ? Math.min(100, m.gasto) : null;
     const avLblCls = m.notStarted ? 'zero' : (m.avance >= 100 ? 'done' : 'wip');
     const statusTxt = m.notStarted ? '' : (m.status === 'over' ? 'Sobre presupuesto' : (m.status === 'near' ? 'Cerca del límite' : ''));
     let countsHtml = '';
@@ -1873,7 +1952,6 @@ function renderAltoNivel() {
           </div>
           <div class="an-bar">
             <div class="an-bar-fill${m.avance >= 100 ? ' done' : ''}" style="width:${fillPct}%"></div>
-            <div class="an-bar-ref" style="left:${refPct}%" title="100% del estimado"></div>
             ${markerPct != null && e.real > 0 ? `<div class="an-bar-marker${m.status ? ' ' + m.status : ''}" style="left:${markerPct}%" title="${Math.round(m.gasto)}% gasto"></div>` : ''}
           </div>
           ${countsHtml}
@@ -1931,7 +2009,7 @@ function renderAltoNivel() {
       </div>
       ${qHtml}
       <div class="an-footer">
-        <span><span class="sw" style="background:var(--plan)"></span>avance<span class="sw" style="background:#9ca3af"></span>gasto (color = salud)<span class="sw" style="background:rgba(17,24,39,.35)"></span>100% del estimado</span>
+        <span><span class="sw" style="background:var(--plan)"></span>avance<span class="sw" style="background:#9ca3af"></span>gasto (color = salud)</span>
         <span>ef = avance% ÷ consumo% · 1.00 significa avanzar al ritmo planificado</span>
       </div>
     </div>`;
@@ -1996,6 +2074,7 @@ async function loadData() {
     workItems  = processItems(raw, iters);
     buildFullTree();
     refreshHours();
+    applyQuarterLevel();
     buildStateMenu();
 
     // Populate team dropdown
