@@ -1992,7 +1992,7 @@ function renderAltoNivel() {
     const badge = deltaBadge(e);
     const fillPct = m.avance != null ? Math.min(100, m.avance) : 0;
     const avLblCls = m.notStarted ? 'zero' : (m.avance >= 100 ? 'done' : 'wip');
-    const statusTxt = m.notStarted ? '' : (m.status === 'over' ? 'Sobre presupuesto' : (m.status === 'near' ? 'Cerca del límite' : ''));
+    const statusTxt = m.notStarted ? '' : (m.status === 'over' ? 'Sobre presupuesto' : '');
     let countsHtml = '';
     if (e.epicNode) {
       const c = countDescByType(e.epicNode);
