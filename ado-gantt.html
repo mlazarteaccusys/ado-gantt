@@ -1917,7 +1917,7 @@ function fmtHrs(n) { return (Math.round(n * 10) / 10).toLocaleString('es-AR'); }
 const Q_RULES = [
   { q: 'Q1', match: /fase\s*0|core\s*estable/i },
   { q: 'Q2', match: /fase\s*2|new\s*look/i },
-  { q: 'Q3', match: /fase\s*4|new\s*ejecutor|planificador/i },
+  { q: 'Q3', match: /fase\s*4|new\s*ejecutor|planificador|servicio\s*de\s*ejecuci/i },
   { q: 'Q4', match: /configuraci/i },
 ];
 const Q_LABEL = { Q1: 'Q1 · Core Estable', Q2: 'Q2 · Anticipación Predictiva + New Look and Feel', Q3: 'Q3 · Asistencia Operativa + New Ejecutor + Planificador', Q4: 'Q4 · Configuración', '—': 'Sin trimestre asignado' };
