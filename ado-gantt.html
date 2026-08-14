@@ -1960,8 +1960,8 @@ function projectProgress(entries) {
   return den ? Math.round(num / den) : null;
 }
 
-// Métricas ejecutivas de una etapa: avance, % gastado, eficiencia (avance/gasto),
-// estado de presupuesto, y proyección de horas totales al ritmo actual.
+// Métricas ejecutivas de una etapa: avance, % gastado, eficiencia (avance/gasto)
+// y estado de presupuesto.
 function stageMetrics(e) {
   const avance = stageProgress(e); // 0-100 o null si no matcheó ninguna Epic
   const gasto = e.est ? Math.round(e.real / e.est * 1000) / 10 : null;
@@ -1972,8 +1972,7 @@ function stageMetrics(e) {
     if (gasto > 110) status = 'over';
     else if (gasto >= 90) status = 'near';
   }
-  const projection = (avance != null && avance > 0 && avance < 100) ? Math.round(e.real / (avance / 100)) : null;
-  return { avance, gasto, ef, status, notStarted, projection };
+  return { avance, gasto, ef, status, notStarted };
 }
 // Badge de desvío bidireccional (+X% sobre, -X% bajo, — si no arrancó)
 function deltaBadge(real, est) {
@@ -2050,7 +2049,7 @@ function renderAltoNivel() {
         <div class="an-right">
           <div>
             <div class="an-num">${fmtHrs(e.real)} / ${fmtHrs(e.est)}</div>
-            <div class="an-sub">horas totales${m.projection != null ? ` · proyección ${fmtHrs(m.projection)}` : ''}</div>
+            <div class="an-sub">horas totales</div>
             ${e.upgradeHours ? `<div class="an-upgrade" title="Estimado ampliado de ${fmtHrs(e.estBase)} a ${fmtHrs(e.est)} hs">↑ ampliado +${fmtHrs(e.upgradeHours)} hs${badgeOriginal ? ` · vs. original <span class="an-badge-mini ${badgeOriginal.cls}">${badgeOriginal.text}</span>` : ''}</div>` : ''}
           </div>
           ${badge ? `<span class="an-badge ${badge.cls}" title="% horas consumidas">${badge.text}</span>` : ''}
