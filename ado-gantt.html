@@ -270,6 +270,8 @@ a.ititle:hover { color: #2563eb; text-decoration: underline; }
 .an-stat .lbl { font-size: var(--text-meta); font-weight: 700; color: #9ca3af; text-transform: uppercase; letter-spacing: .05em; margin-bottom: 6px; }
 .an-stat .val { font-size: 18px; font-weight: 700; color: #111827; font-variant-numeric: tabular-nums; }
 .an-stat .val.bad { color: var(--crit); } .an-stat .val.warn { color: var(--warn); } .an-stat .val.ok { color: var(--ok); }
+.an-sub-stat { font-size: var(--text-meta); color: #9ca3af; margin-top: 4px; font-variant-numeric: tabular-nums; }
+.an-sub-stat .bad { color: var(--crit); font-weight: 600; } .an-sub-stat .warn { color: var(--warn); font-weight: 600; } .an-sub-stat .ok { color: var(--ok); font-weight: 600; }
 .an-qcard { border: 1px solid #e5e7eb; border-radius: 10px; background: #fff; margin-bottom: 18px; overflow: hidden; }
 .an-qhead { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 18px; cursor: pointer; user-select: none; }
 .an-qhead:hover { background: #fafbfc; }
@@ -303,6 +305,10 @@ a.ititle:hover { color: #2563eb; text-decoration: underline; }
 .an-badge.over  { background: var(--crit-soft); color: var(--crit); }
 .an-badge.under { background: var(--ok-soft); color: var(--ok); }
 .an-badge.flat  { background: #f3f4f6; color: #9ca3af; }
+.an-badge-mini { font-weight: 700; font-variant-numeric: tabular-nums; }
+.an-badge-mini.over  { color: var(--crit); }
+.an-badge-mini.under { color: var(--ok); }
+.an-badge-mini.flat  { color: #9ca3af; }
 .an-footer { display: flex; justify-content: space-between; align-items: center; font-size: var(--text-meta); color: #9ca3af; margin-top: 6px; flex-wrap: wrap; gap: 10px; padding: 0 4px; }
 .an-footer .sw { display: inline-block; width: 13px; height: 8px; border-radius: 2px; margin: 0 5px 0 14px; vertical-align: middle; }
 .an-footer .sw:first-child { margin-left: 0; }
@@ -1960,10 +1966,10 @@ function stageMetrics(e) {
   return { avance, gasto, ef, status, notStarted, projection };
 }
 // Badge de desvío bidireccional (+X% sobre, -X% bajo, — si no arrancó)
-function deltaBadge(e) {
-  if (!e.est) return null;
-  if (e.real === 0) return { text: '—', cls: 'flat' };
-  const pct = Math.round((e.real - e.est) / e.est * 100);
+function deltaBadge(real, est) {
+  if (!est) return null;
+  if (real === 0) return { text: '—', cls: 'flat' };
+  const pct = Math.round((real - est) / est * 100);
   if (pct === 0) return { text: '0%', cls: 'flat' };
   return { text: (pct > 0 ? '+' + pct : Math.abs(pct)) + '%', cls: pct > 0 ? 'over' : 'under' };
 }
@@ -1981,15 +1987,23 @@ function renderAltoNivel() {
   }
 
   const totEst = hoursData.reduce((a, e) => a + e.est, 0);
+  const totEstBase = hoursData.reduce((a, e) => a + e.estBase, 0);
   const totReal = hoursData.reduce((a, e) => a + e.real, 0);
+  const totUpgrade = totEst - totEstBase;
   const desvio = totReal - totEst;
   const desvPct = totEst ? Math.round(desvio / totEst * 1000) / 10 : 0;
   const desvClass = desvio > totEst * 0.05 ? 'bad' : (desvio > 0 ? 'warn' : 'ok');
+  // Desvío contra el estimado original (sin upgrades) — para que un upgrade real
+  // no "tape" un sobrecosto ya consumido; solo tiene sentido si hubo algún upgrade.
+  const desvioOriginal = totReal - totEstBase;
+  const desvPctOriginal = totEstBase ? Math.round(desvioOriginal / totEstBase * 1000) / 10 : 0;
+  const desvClassOriginal = desvioOriginal > totEstBase * 0.05 ? 'bad' : (desvioOriginal > 0 ? 'warn' : 'ok');
   const projProg = projectProgress(hoursData);
 
   function rowHtml(e) {
     const m = stageMetrics(e);
-    const badge = deltaBadge(e);
+    const badge = deltaBadge(e.real, e.est);
+    const badgeOriginal = e.upgradeHours ? deltaBadge(e.real, e.estBase) : null;
     const fillPct = m.avance != null ? Math.min(100, m.avance) : 0;
     const avLblCls = m.notStarted ? 'zero' : (m.avance >= 100 ? 'done' : 'wip');
     const statusTxt = m.notStarted ? '' : (m.status === 'over' ? 'Sobre presupuesto' : '');
@@ -2023,7 +2037,7 @@ function renderAltoNivel() {
           <div>
             <div class="an-num">${fmtHrs(e.real)} / ${fmtHrs(e.est)}</div>
             <div class="an-sub">horas totales${m.projection != null ? ` · proyección ${fmtHrs(m.projection)}` : ''}</div>
-            ${e.upgradeHours ? `<div class="an-upgrade" title="Estimado ampliado de ${fmtHrs(e.est - e.upgradeHours)} a ${fmtHrs(e.est)} hs">↑ ampliado +${fmtHrs(e.upgradeHours)} hs</div>` : ''}
+            ${e.upgradeHours ? `<div class="an-upgrade" title="Estimado ampliado de ${fmtHrs(e.estBase)} a ${fmtHrs(e.est)} hs">↑ ampliado +${fmtHrs(e.upgradeHours)} hs${badgeOriginal ? ` · vs. original <span class="an-badge-mini ${badgeOriginal.cls}">${badgeOriginal.text}</span>` : ''}</div>` : ''}
           </div>
           ${badge ? `<span class="an-badge ${badge.cls}">${badge.text}</span>` : ''}
         </div>
@@ -2068,7 +2082,7 @@ function renderAltoNivel() {
       <div class="an-stats">
         <div class="an-stat"><div class="lbl">Estimadas</div><div class="val">${fmtHrs(totEst)} hs</div></div>
         <div class="an-stat"><div class="lbl">Consumidas</div><div class="val">${fmtHrs(totReal)} hs</div></div>
-        <div class="an-stat"><div class="lbl">Desvío</div><div class="val ${desvClass}">${desvio >= 0 ? '+' : ''}${fmtHrs(desvio)} hs (${desvPct >= 0 ? '+' : ''}${desvPct}%)</div></div>
+        <div class="an-stat"><div class="lbl">Desvío</div><div class="val ${desvClass}">${desvio >= 0 ? '+' : ''}${fmtHrs(desvio)} hs (${desvPct >= 0 ? '+' : ''}${desvPct}%)</div>${totUpgrade ? `<div class="an-sub-stat">vs. original: <span class="${desvClassOriginal}">${desvioOriginal >= 0 ? '+' : ''}${fmtHrs(desvioOriginal)} hs (${desvPctOriginal >= 0 ? '+' : ''}${desvPctOriginal}%)</span></div>` : ''}</div>
         <div class="an-stat"><div class="lbl">Avance</div><div class="val">${projProg != null ? projProg + '%' : '—'}</div></div>
       </div>
       ${qHtml}
@@ -2112,7 +2126,8 @@ function refreshHours() {
     : [];
   hoursData = rows.filter(r => r.name).map(r => {
     const upgradeHours = r.upgrade || 0;
-    return { extId: null, name: r.name, real: r.real || 0, est: (r.est || 0) + upgradeHours, upgradeHours };
+    const estBase = r.est || 0;
+    return { extId: null, name: r.name, real: r.real || 0, est: estBase + upgradeHours, estBase, upgradeHours };
   });
   matchHoursToEpics();
   if (activeTab === 'alto-nivel') renderAltoNivel();
