@@ -2084,7 +2084,7 @@ function renderAltoNivel() {
         <p>Horas estimadas vs. reales, contrastadas contra el avance real de cada etapa.</p>
       </div>
       <div class="an-stats">
-        <div class="an-stat"><div class="lbl">Estimadas</div><div class="val">${fmtHrs(totEst)} hs</div></div>
+        <div class="an-stat"><div class="lbl">Estimadas</div><div class="val">${fmtHrs(totEst)} hs</div>${totUpgrade ? `<div class="an-sub-stat">original: ${fmtHrs(totEstBase)} hs</div>` : ''}</div>
         <div class="an-stat"><div class="lbl">Consumidas</div><div class="val">${fmtHrs(totReal)} hs</div></div>
         <div class="an-stat"><div class="lbl">Desvío</div><div class="val ${desvClass}">${desvioTxt}</div>${totUpgrade ? `<div class="an-sub-stat">vs. original: <span class="${desvClassOriginal}">${desvioOriginal >= 0 ? '+' : ''}${fmtHrs(desvioOriginal)} hs (${desvPctOriginal >= 0 ? '+' : ''}${desvPctOriginal}%)</span></div>` : ''}</div>
         <div class="an-stat"><div class="lbl">Avance</div><div class="val">${projProg != null ? projProg + '%' : '—'}</div></div>
