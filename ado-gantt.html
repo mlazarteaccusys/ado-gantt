@@ -1952,7 +1952,10 @@ function shortStageName(name) {
 }
 // % de avance real de la etapa (progreso de su Epic; 100 si el rollup la da por cerrada)
 function stageProgress(e) {
-  if (!e.epicNode) return null;
+  // Sin Epic vinculada en ADO (todavía no se creó / no hay match): cuenta como 0%,
+  // no como "sin dato" — si no, esa etapa desaparece del promedio de AVANCE en vez
+  // de arrastrarlo hacia abajo como corresponde a un trabajo que no arrancó.
+  if (!e.epicNode) return 0;
   return epicDisplayState(e.epicNode) === 'Closed' ? 100 : (e.epicNode.progress || 0);
 }
 // Avance global ponderado por horas estimadas: Σ(est × progreso) / Σ(est)
