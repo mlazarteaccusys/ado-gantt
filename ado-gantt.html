@@ -1955,7 +1955,10 @@ function projectProgress(entries) {
   for (const e of entries) {
     const p = stageProgress(e);
     if (p === null) continue;
-    num += e.est * p; den += e.est;
+    // Pondera por el estimado ORIGINAL, no el ampliado: cargar un upgrade no debe
+    // mover el avance general del proyecto, solo el trabajo hecho lo mueve.
+    const w = e.estBase != null ? e.estBase : e.est;
+    num += w * p; den += w;
   }
   return den ? Math.round(num / den) : null;
 }
