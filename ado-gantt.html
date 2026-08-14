@@ -1993,6 +1993,10 @@ function renderAltoNivel() {
   const desvio = totReal - totEst;
   const desvPct = totEst ? Math.round(desvio / totEst * 1000) / 10 : 0;
   const desvClass = desvio > totEst * 0.05 ? 'bad' : (desvio > 0 ? 'warn' : 'ok');
+  // Por debajo del presupuesto ampliado no es "un desvío negativo" que valga la pena
+  // cuantificar — es simplemente estar en línea. Se muestra como 0 en vez de un
+  // número de "ahorro" que puede confundirse con otra métrica.
+  const desvioTxt = desvio > 0 ? `+${fmtHrs(desvio)} hs (+${desvPct}%)` : '0 hs (0%)';
   // Desvío contra el estimado original (sin upgrades) — para que un upgrade real
   // no "tape" un sobrecosto ya consumido; solo tiene sentido si hubo algún upgrade.
   const desvioOriginal = totReal - totEstBase;
@@ -2082,7 +2086,7 @@ function renderAltoNivel() {
       <div class="an-stats">
         <div class="an-stat"><div class="lbl">Estimadas</div><div class="val">${fmtHrs(totEst)} hs</div></div>
         <div class="an-stat"><div class="lbl">Consumidas</div><div class="val">${fmtHrs(totReal)} hs</div></div>
-        <div class="an-stat"><div class="lbl">Desvío</div><div class="val ${desvClass}">${desvio >= 0 ? '+' : ''}${fmtHrs(desvio)} hs (${desvPct >= 0 ? '+' : ''}${desvPct}%)</div>${totUpgrade ? `<div class="an-sub-stat">vs. original: <span class="${desvClassOriginal}">${desvioOriginal >= 0 ? '+' : ''}${fmtHrs(desvioOriginal)} hs (${desvPctOriginal >= 0 ? '+' : ''}${desvPctOriginal}%)</span></div>` : ''}</div>
+        <div class="an-stat"><div class="lbl">Desvío</div><div class="val ${desvClass}">${desvioTxt}</div>${totUpgrade ? `<div class="an-sub-stat">vs. original: <span class="${desvClassOriginal}">${desvioOriginal >= 0 ? '+' : ''}${fmtHrs(desvioOriginal)} hs (${desvPctOriginal >= 0 ? '+' : ''}${desvPctOriginal}%)</span></div>` : ''}</div>
         <div class="an-stat"><div class="lbl">Avance</div><div class="val">${projProg != null ? projProg + '%' : '—'}</div></div>
       </div>
       ${qHtml}
