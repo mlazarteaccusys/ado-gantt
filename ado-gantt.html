@@ -362,7 +362,7 @@ a.ititle:hover { color: #2563eb; text-decoration: underline; }
       <label>Horas por etapa <span style="font-weight:400;text-transform:none">(cargá o editá los datos a mano en la grilla)</span></label>
       <table class="hg-table">
         <thead>
-          <tr><th>Etapa</th><th>Consumidas</th><th>Estimadas</th><th>Adicionales</th><th></th></tr>
+          <tr><th>Etapa</th><th>Consumidas</th><th>Estimadas</th><th>Adicionales</th><th>Q</th><th></th></tr>
         </thead>
         <tbody id="hoursGridBody"></tbody>
       </table>
@@ -514,7 +514,7 @@ function saveConfig() {
     manualSprints: document.getElementById('cfgSprints').value,
     hoursRows: hoursRowsDraft
       .filter(r => r.name && r.name.trim())
-      .map(r => ({ name: r.name.trim(), real: parseNum(r.real), est: parseNum(r.est), upgrade: parseNum(r.upgrade) })),
+      .map(r => ({ name: r.name.trim(), real: parseNum(r.real), est: parseNum(r.est), upgrade: parseNum(r.upgrade), q: r.q || '' })),
   };
   localStorage.setItem('adoGanttCfg2', JSON.stringify(cfg));
   document.getElementById('configOverlay').style.display = 'none';
@@ -1793,11 +1793,20 @@ function renderHoursGrid() {
       <td><input type="text" value="${esc(r.real ?? '')}" oninput="hoursRowsDraft[${i}].real=this.value" placeholder="0" /></td>
       <td><input type="text" value="${esc(r.est ?? '')}" oninput="hoursRowsDraft[${i}].est=this.value" placeholder="0" /></td>
       <td><input type="text" value="${esc(r.upgrade ?? '')}" oninput="hoursRowsDraft[${i}].upgrade=this.value" placeholder="0" /></td>
+      <td>
+        <select onchange="hoursRowsDraft[${i}].q=this.value">
+          <option value=""${!r.q ? ' selected' : ''}>Auto</option>
+          <option value="Q1"${r.q === 'Q1' ? ' selected' : ''}>Q1</option>
+          <option value="Q2"${r.q === 'Q2' ? ' selected' : ''}>Q2</option>
+          <option value="Q3"${r.q === 'Q3' ? ' selected' : ''}>Q3</option>
+          <option value="Q4"${r.q === 'Q4' ? ' selected' : ''}>Q4</option>
+        </select>
+      </td>
       <td><button type="button" class="hg-delbtn" onclick="removeHoursRow(${i})" title="Eliminar etapa">✕</button></td>
     </tr>`).join('');
 }
 function addHoursRow() {
-  hoursRowsDraft.push({ name: '', real: '', est: '', upgrade: '' });
+  hoursRowsDraft.push({ name: '', real: '', est: '', upgrade: '', q: '' });
   renderHoursGrid();
 }
 function removeHoursRow(i) {
@@ -1923,6 +1932,7 @@ const Q_RULES = [
 const Q_LABEL = { Q1: 'Q1 · Core Estable', Q2: 'Q2 · Anticipación Predictiva + New Look and Feel', Q3: 'Q3 · Asistencia Operativa + New Ejecutor + Planificador', Q4: 'Q4 · Configuración', '—': 'Sin trimestre asignado' };
 
 function stageQuarter(e) {
+  if (e.manualQ) return e.manualQ; // asignación manual desde la grilla de Config, tiene prioridad
   for (const r of Q_RULES) if (r.match.test(e.name || '')) return r.q;
   return '—';
 }
@@ -2131,7 +2141,12 @@ function refreshHours() {
   hoursData = rows.filter(r => r.name).map(r => {
     const upgradeHours = r.upgrade || 0;
     const estBase = r.est || 0;
-    return { extId: null, name: r.name, real: r.real || 0, est: estBase + upgradeHours, estBase, upgradeHours };
+    const real = r.real || 0;
+    // El nuevo total nunca puede ser menor a lo ya consumido: si el gasto ya superó
+    // el estimado original antes de pedir el upgrade, las horas adicionales se suman
+    // sobre lo ya consumido (no sobre el estimado viejo), para no nacer ya "sobre presupuesto".
+    const est = Math.max(estBase, real) + upgradeHours;
+    return { extId: null, name: r.name, real, est, estBase, upgradeHours, manualQ: r.q || null };
   });
   matchHoursToEpics();
   if (activeTab === 'alto-nivel') renderAltoNivel();
