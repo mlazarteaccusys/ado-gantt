@@ -670,6 +670,7 @@ async function onTeamChange(teamName) {
     lastRaw = raw;
     workItems = processItems(raw, iters);
     buildFullTree();
+    syncEpicsIntoHoursRows();
     refreshHours();
     applyQuarterLevel();
     buildStateMenu();
@@ -1859,18 +1860,34 @@ function addHoursRow() {
 // Agrega una fila por cada Epic real del Gantt que todavía no esté en la grilla
 // (match exacto de título, sin importar mayúsculas), para no tener que tipear
 // los nombres de las etapas a mano. Deja vacíos consumidas/estimadas para completar.
-function loadEpicsIntoGrid() {
+// Agrega una fila por cada Epic real del Gantt que todavía no esté en `rows`
+// (match exacto de título, sin importar mayúsculas). No pisa ni duplica filas
+// existentes — solo agrega las que faltan, con horas vacías para completar.
+function mergeEpicsIntoRows(rows) {
   const epics = (workItems || []).filter(w => w.type === 'Epic');
-  if (!epics.length) { alert('Todavía no hay Epics cargadas del Gantt. Guardá primero Organization/Project/PAT y volvé a abrir Config.'); return; }
-  let added = 0;
+  const out = rows.slice();
   for (const ep of epics) {
-    const exists = hoursRowsDraft.some(r => (r.name || '').trim().toLowerCase() === ep.title.trim().toLowerCase());
-    if (!exists) { hoursRowsDraft.push({ name: ep.title, real: '', est: '', upgrade: '', q: '' }); added++; }
+    const exists = out.some(r => (r.name || '').trim().toLowerCase() === ep.title.trim().toLowerCase());
+    if (!exists) out.push({ name: ep.title, real: '', est: '', upgrade: '', q: '' });
   }
-  // Limpia filas vacías que hayan quedado de "+ Agregar etapa" sin usar
-  hoursRowsDraft = hoursRowsDraft.filter(r => r.name && r.name.trim());
+  return out;
+}
+// Se llama en cada carga/actualización del Gantt: agrega automáticamente las
+// Epics nuevas a cfg.hoursRows (persistido), igual que el árbol del Gantt se
+// actualiza solo. Si Config está abierto, refleja el cambio en la grilla visible.
+function syncEpicsIntoHoursRows() {
+  cfg.hoursRows = mergeEpicsIntoRows(cfg.hoursRows || []);
+  localStorage.setItem('adoGanttCfg2', JSON.stringify(cfg));
+  if (document.getElementById('configOverlay').style.display === 'flex') {
+    hoursRowsDraft = cfg.hoursRows.map(r => ({ ...r }));
+    renderHoursGrid();
+  }
+}
+function loadEpicsIntoGrid() {
+  const before = hoursRowsDraft.length;
+  hoursRowsDraft = mergeEpicsIntoRows(hoursRowsDraft.filter(r => r.name && r.name.trim()));
   renderHoursGrid();
-  if (!added) alert('Ya estaban todas las Epics cargadas en la grilla.');
+  if (hoursRowsDraft.length === before) alert('Ya estaban todas las Epics cargadas en la grilla.');
 }
 function removeHoursRow(i) {
   hoursRowsDraft.splice(i, 1);
@@ -2255,6 +2272,7 @@ async function loadData() {
     lastRaw    = raw;
     workItems  = processItems(raw, iters);
     buildFullTree();
+    syncEpicsIntoHoursRows();
     refreshHours();
     applyQuarterLevel();
     buildStateMenu();
