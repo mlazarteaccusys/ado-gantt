@@ -373,7 +373,9 @@ a.ititle:hover { color: #2563eb; text-decoration: underline; }
         <tbody id="hoursGridBody"></tbody>
       </table>
       <button type="button" class="hg-addbtn" onclick="addHoursRow()">+ Agregar etapa</button>
+      <button type="button" class="hg-addbtn" onclick="shareHoursLink()" id="shareHoursBtn">🔗 Copiar link con estas horas</button>
       <small>"Adicionales" son horas de upgrade de alcance que se suman al estimado (se muestran como "ampliado" en Alto Nivel).</small>
+      <small>El link de arriba lleva la grilla de horas (y los sprints manuales) para que quien lo abra la vea igual — nunca incluye tu PAT.</small>
       <details style="margin-top:10px">
         <summary style="cursor:pointer;font-size:12px;color:#666">Importar desde el reporte semanal pegado (opcional)</summary>
         <textarea id="cfgHoursImport" rows="5" style="width:100%;margin-top:8px;padding:8px 12px;border:1px solid #ddd;border-radius:6px;font-size:12px;font-family:monospace;resize:vertical" placeholder="121930 - ACCUSYS-PROBATCH NV-FASE 0-Core Estable&#10;645,5 de 360"></textarea>
@@ -494,8 +496,46 @@ let tlStart = null, tlDays = 0;
 let timeAxis = 'sprint';   // 'sprint' | 'month' — eje del encabezado del timeline
 let zoomPct = 100;         // zoom horizontal del timeline (%)
 
+// ─── Compartir horas por link ──────────────────────────────────────────────────
+// La grilla de horas y los sprints manuales viajan codificados en el hash de la
+// URL (nunca el PAT/org/proyecto, que son credenciales y quedan solo en este
+// navegador). Al abrir un link con #horas=..., se importan a la config local.
+function encodeShareData(data) {
+  return btoa(unescape(encodeURIComponent(JSON.stringify(data))));
+}
+function decodeShareData(str) {
+  try { return JSON.parse(decodeURIComponent(escape(atob(str)))); } catch(e) { return null; }
+}
+function shareHoursLink() {
+  const data = {
+    hoursRows: hoursRowsDraft.filter(r => r.name && r.name.trim())
+      .map(r => ({ name: r.name.trim(), real: parseNum(r.real), est: parseNum(r.est), upgrade: parseNum(r.upgrade), q: r.q || '' })),
+    manualSprints: document.getElementById('cfgSprints').value,
+  };
+  const url = `${location.origin}${location.pathname}#horas=${encodeShareData(data)}`;
+  const btn = document.getElementById('shareHoursBtn');
+  navigator.clipboard.writeText(url).then(() => {
+    if (btn) { const orig = btn.textContent; btn.textContent = '✓ Link copiado'; setTimeout(() => btn.textContent = orig, 2000); }
+  }).catch(() => { prompt('Copiá este link:', url); });
+}
+// Si la URL trae horas compartidas, las importa a la config local antes de arrancar.
+function importSharedHoursFromUrl() {
+  const m = location.hash.match(/#horas=([^&]+)/);
+  if (!m) return false;
+  const data = decodeShareData(m[1]);
+  if (!data) return false;
+  let cfg2;
+  try { cfg2 = JSON.parse(localStorage.getItem('adoGanttCfg2') || '{}'); } catch(e) { cfg2 = {}; }
+  if (data.hoursRows) cfg2.hoursRows = data.hoursRows;
+  if (data.manualSprints !== undefined) cfg2.manualSprints = data.manualSprints;
+  localStorage.setItem('adoGanttCfg2', JSON.stringify(cfg2));
+  history.replaceState(null, '', location.pathname + location.search); // limpia el hash, ya se guardó
+  return true;
+}
+
 // ─── Config ────────────────────────────────────────────────────────────────────
 function loadCfg() {
+  importSharedHoursFromUrl();
   try { cfg = JSON.parse(localStorage.getItem('adoGanttCfg2') || '{}'); } catch(e) { cfg = {}; }
   // Equipo por defecto al abrir (una sola vez): usa el Team de la config o "Evolutivo Team"
   if (!selectedTeam) selectedTeam = cfg.team || 'Evolutivo Team';
@@ -1939,6 +1979,13 @@ const Q_LABEL = { Q1: 'Q1 · Core Estable', Q2: 'Q2 · Anticipación Predictiva 
 
 function stageQuarter(e) {
   if (e.manualQ) return e.manualQ; // asignación manual desde la grilla de Config, tiene prioridad
+  // Si la etapa ya está vinculada a una Epic real (por matchHoursToEpics), el Q se
+  // hereda del título de esa Epic — así el Gantt y Alto Nivel quedan siempre
+  // consistentes sin tener que agregar una regla nueva por cada nombre de etapa.
+  if (e.epicNode) {
+    const q = epicQuarter(e.epicNode.title);
+    if (q) return q;
+  }
   for (const r of Q_RULES) if (r.match.test(e.name || '')) return r.q;
   return '—';
 }
