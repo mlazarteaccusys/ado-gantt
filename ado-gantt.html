@@ -373,6 +373,7 @@ a.ititle:hover { color: #2563eb; text-decoration: underline; }
         <tbody id="hoursGridBody"></tbody>
       </table>
       <button type="button" class="hg-addbtn" onclick="addHoursRow()">+ Agregar etapa</button>
+      <button type="button" class="hg-addbtn" onclick="loadEpicsIntoGrid()">📥 Cargar Epics del Gantt</button>
       <button type="button" class="hg-addbtn" onclick="shareHoursLink()" id="shareHoursBtn">🔗 Copiar link con estas horas</button>
       <small>"Adicionales" son horas de upgrade de alcance que se suman al estimado (se muestran como "ampliado" en Alto Nivel).</small>
       <small>El link de arriba lleva la grilla de horas (y los sprints manuales) para que quien lo abra la vea igual — nunca incluye tu PAT.</small>
@@ -1854,6 +1855,22 @@ function renderHoursGrid() {
 function addHoursRow() {
   hoursRowsDraft.push({ name: '', real: '', est: '', upgrade: '', q: '' });
   renderHoursGrid();
+}
+// Agrega una fila por cada Epic real del Gantt que todavía no esté en la grilla
+// (match exacto de título, sin importar mayúsculas), para no tener que tipear
+// los nombres de las etapas a mano. Deja vacíos consumidas/estimadas para completar.
+function loadEpicsIntoGrid() {
+  const epics = (workItems || []).filter(w => w.type === 'Epic');
+  if (!epics.length) { alert('Todavía no hay Epics cargadas del Gantt. Guardá primero Organization/Project/PAT y volvé a abrir Config.'); return; }
+  let added = 0;
+  for (const ep of epics) {
+    const exists = hoursRowsDraft.some(r => (r.name || '').trim().toLowerCase() === ep.title.trim().toLowerCase());
+    if (!exists) { hoursRowsDraft.push({ name: ep.title, real: '', est: '', upgrade: '', q: '' }); added++; }
+  }
+  // Limpia filas vacías que hayan quedado de "+ Agregar etapa" sin usar
+  hoursRowsDraft = hoursRowsDraft.filter(r => r.name && r.name.trim());
+  renderHoursGrid();
+  if (!added) alert('Ya estaban todas las Epics cargadas en la grilla.');
 }
 function removeHoursRow(i) {
   hoursRowsDraft.splice(i, 1);
