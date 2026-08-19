@@ -2068,14 +2068,14 @@ function stageMetrics(e) {
   return { avance, gasto, ef, status, notStarted };
 }
 // Badge de desvío bidireccional (+X% sobre, -X% bajo, — si no arrancó)
+// % de horas consumidas sobre el estimado (real/est). Si se pasó del estimado
+// (>100%) queda en rojo; si no, en verde — el color ya comunica el desvío.
 function deltaBadge(real, est) {
   if (!est) return null;
   if (real === 0) return { text: '—', cls: 'flat', tip: 'Todavía no se consumieron horas' };
-  const pct = Math.round((real - est) / est * 100);
-  if (pct === 0) return { text: '0%', cls: 'flat', tip: 'Consumido = estimado, sin desvío' };
-  const cls = pct > 0 ? 'over' : 'under';
-  const tip = pct > 0 ? `${pct}% por encima del estimado` : `${Math.abs(pct)}% por debajo del estimado`;
-  return { text: (pct > 0 ? '+' + pct : Math.abs(pct)) + '%', cls, tip };
+  const pct = Math.round(real / est * 100);
+  const cls = pct > 100 ? 'over' : (pct === 100 ? 'flat' : 'under');
+  return { text: pct + '%', cls, tip: `${pct}% de las horas estimadas ya consumidas` };
 }
 
 function toggleQuarterCollapse(q) {
