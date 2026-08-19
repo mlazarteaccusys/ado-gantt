@@ -2070,10 +2070,12 @@ function stageMetrics(e) {
 // Badge de desvío bidireccional (+X% sobre, -X% bajo, — si no arrancó)
 function deltaBadge(real, est) {
   if (!est) return null;
-  if (real === 0) return { text: '—', cls: 'flat' };
+  if (real === 0) return { text: '—', cls: 'flat', tip: 'Todavía no se consumieron horas' };
   const pct = Math.round((real - est) / est * 100);
-  if (pct === 0) return { text: '0%', cls: 'flat' };
-  return { text: (pct > 0 ? '+' + pct : Math.abs(pct)) + '%', cls: pct > 0 ? 'over' : 'under' };
+  if (pct === 0) return { text: '0%', cls: 'flat', tip: 'Consumido = estimado, sin desvío' };
+  const cls = pct > 0 ? 'over' : 'under';
+  const tip = pct > 0 ? `${pct}% por encima del estimado` : `${Math.abs(pct)}% por debajo del estimado`;
+  return { text: (pct > 0 ? '+' + pct : Math.abs(pct)) + '%', cls, tip };
 }
 
 function toggleQuarterCollapse(q) {
@@ -2145,7 +2147,7 @@ function renderAltoNivel() {
             <div class="an-sub">horas totales</div>
             ${e.upgradeHours ? `<div class="an-upgrade" title="Estimado ampliado de ${fmtHrs(e.estBase)} a ${fmtHrs(e.est)} hs">↑ ampliado +${fmtHrs(e.upgradeHours)} hs${badgeOriginal ? ` · vs. original <span class="an-badge-mini ${badgeOriginal.cls}">${badgeOriginal.text}</span>` : ''}</div>` : ''}
           </div>
-          ${badge ? `<span class="an-badge ${badge.cls}" onmouseenter="showTip(event,'% horas consumidas')" onmousemove="moveTip(event)" onmouseleave="hideTip()">${badge.text}</span>` : ''}
+          ${badge ? `<span class="an-badge ${badge.cls}" onmouseenter="showTip(event,'${esc(badge.tip)}')" onmousemove="moveTip(event)" onmouseleave="hideTip()">${badge.text}</span>` : ''}
         </div>
       </div>
     </div>`;
