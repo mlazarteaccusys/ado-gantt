@@ -394,7 +394,7 @@ a.ititle:hover { color: #2563eb; text-decoration: underline; }
   <div class="brand"><span class="brand-logo">GP</span><h1>Gantt Probatch</h1></div>
   <div class="sep"></div>
   <div class="axis-toggle" id="tabToggle">
-    <button class="axis-opt" data-tab="alto-nivel" onclick="setActiveTab('alto-nivel')">Alto Nivel</button>
+    <button class="axis-opt" data-tab="alto-nivel" onclick="setActiveTab('alto-nivel')">Control de Proyecto</button>
     <button class="axis-opt active" data-tab="gantt" onclick="setActiveTab('gantt')">Gantt</button>
   </div>
   <div class="sep"></div>
@@ -581,7 +581,7 @@ function showConfig() {
   const legacyRows = (!cfg.hoursRows || !cfg.hoursRows.length) && cfg.hoursText
     ? parseHours(cfg.hoursText).map(e => ({ name: e.name, real: e.real, est: e.est, upgrade: '' }))
     : null;
-  hoursRowsDraft = (legacyRows || cfg.hoursRows || []).map(r => ({ ...r }));
+  hoursRowsDraft = (legacyRows || cfg.hoursRows || DEFAULT_HOURS_ROWS).map(r => ({ ...r }));
   renderHoursGrid();
   document.getElementById('configOverlay').style.display = 'flex';
 }
@@ -682,6 +682,21 @@ async function onTeamChange(teamName) {
     mount.innerHTML = `<div class="err"><strong>Error al cargar equipo</strong><br>${esc(e.message)}</div>`;
   }
 }
+
+// ─── Horas por etapa: mock por defecto (editable) ─────────────────────────────
+// Igual que MANUAL_SPRINTS_DEFAULT: son datos de arranque para que la grilla
+// nunca aparezca vacía (ej. primera vez en un navegador nuevo), pero cfg.hoursRows
+// los pisa en cuanto el usuario guarda Config una vez.
+const DEFAULT_HOURS_ROWS = [
+  { name: 'Fase 0: Core Estable', real: 645.5, est: 360, upgrade: 0, q: '', planned: true },
+  { name: 'UX/UI Web Modernization: New look and feel Probatch', real: 665, est: 605, upgrade: 0, q: '', planned: true },
+  { name: 'Fase 2: Anticipación Predictiva', real: 685.5, est: 690, upgrade: 0, q: '', planned: true },
+  { name: 'Fase 4: Asistencia Operativa', real: 319.5, est: 120, upgrade: 584, q: '', planned: true },
+  { name: 'UX/UI Web Modernization: New Ejecutor', real: 325.5, est: 160, upgrade: 598, q: '', planned: true },
+  { name: 'Servicio de Ejecución V2', real: 0, est: 0, upgrade: 0, q: '', planned: false },
+  { name: 'UX/UI Web Modernization: New Planificador', real: 0, est: 90, upgrade: 70, q: '', planned: true },
+  { name: 'UX/UI Web Modernization: Configuración', real: 0, est: 232, upgrade: 0, q: '', planned: false },
+];
 
 // ─── Sprint manual override ────────────────────────────────────────────────────
 const MANUAL_SPRINTS_DEFAULT = `Sprint 1,16/03/2026,27/03/2026
@@ -2244,7 +2259,7 @@ function refreshHours() {
   // viejo pegado (cfg.hoursText, de antes de la grilla), usarlo hasta que se guarde Config.
   const rows = (cfg.hoursRows && cfg.hoursRows.length) ? cfg.hoursRows
     : cfg.hoursText ? parseHours(cfg.hoursText).map(e => ({ name: e.name, real: e.real, est: e.est, upgrade: 0 }))
-    : [];
+    : DEFAULT_HOURS_ROWS;
   hoursData = rows.filter(r => r.name).map(r => {
     const upgradeHours = r.upgrade || 0;
     const estBase = r.est || 0;
