@@ -1071,7 +1071,7 @@ function applyQuarterLevel() {
   for (const root of fullTree) {
     if (root.type === 'Quarter') continue; // ya envuelto (no debería pasar, pero por seguridad)
     const stageEntry = hoursByEpic[root.id];
-    const q = stageEntry ? stageQuarter(stageEntry) : epicQuarter(root.title);
+    const q = stageEntry ? stageQuarter(stageEntry) : epicQuarter(root);
     if (q) (qBuckets[q] = qBuckets[q] || []).push(root);
     else noQuarter.push(root);
   }
@@ -1098,10 +1098,26 @@ function applyQuarterLevel() {
   for (const qn of qNodes) collapsed.add(qn.id);
 }
 
-// A qué trimestre pertenece una Epic, según su título (mismas reglas que Q_RULES).
+// Q1=ene-mar, Q2=abr-jun, Q3=jul-sep, Q4=oct-dic — coincide con las fechas
+// reales de cada fase del proyecto.
+function dateQuarter(date) {
+  if (!date) return null;
+  const m = date.getMonth();
+  if (m <= 2) return 'Q1';
+  if (m <= 5) return 'Q2';
+  if (m <= 8) return 'Q3';
+  return 'Q4';
+}
+// A qué trimestre pertenece una Epic: primero por título (mismas reglas que
+// Q_RULES, para las fases ya nombradas), y si no matchea ninguna, por su fecha
+// de inicio/fin — así una Epic nueva sin un nombre "conocido" (ej. "Seguridad")
+// igual cae en el trimestre correcto según cuándo está planificada, sin tener
+// que agregar una regla de texto por cada Epic nueva.
 // Fallback cuando la Epic no tiene una etapa de horas asociada (hoursByEpic).
-function epicQuarter(title) {
-  for (const r of Q_RULES) if (r.match.test(title || '')) return r.q;
+function epicQuarter(node) {
+  const title = typeof node === 'string' ? node : (node && node.title) || '';
+  for (const r of Q_RULES) if (r.match.test(title)) return r.q;
+  if (node && typeof node === 'object') return dateQuarter(node.startDate || node.endDate);
   return null;
 }
 // ¿Algún descendiente tiene desvío de fecha activo? (mismo criterio que la franja roja del Gantt)
@@ -2084,7 +2100,7 @@ function stageQuarter(e) {
   // hereda del título de esa Epic — así el Gantt y Alto Nivel quedan siempre
   // consistentes sin tener que agregar una regla nueva por cada nombre de etapa.
   if (e.epicNode) {
-    const q = epicQuarter(e.epicNode.title);
+    const q = epicQuarter(e.epicNode);
     if (q) return q;
   }
   for (const r of Q_RULES) if (r.match.test(e.name || '')) return r.q;
