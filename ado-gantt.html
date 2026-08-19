@@ -511,7 +511,7 @@ function decodeShareData(str) {
 function shareHoursLink() {
   const data = {
     hoursRows: hoursRowsDraft.filter(r => r.name && r.name.trim())
-      .map(r => ({ name: r.name.trim(), real: parseNum(r.real), est: parseNum(r.est), upgrade: parseNum(r.upgrade), q: r.q || '', planned: r.planned !== false })),
+      .map(r => ({ name: r.name.trim(), real: parseNum(r.real), est: parseNum(r.est), upgrade: parseNum(r.upgrade), q: r.q || '', planned: r.planned !== false, pinId: r.pinId || null })),
     manualSprints: document.getElementById('cfgSprints').value,
   };
   const url = `${location.origin}${location.pathname}#horas=${encodeShareData(data)}`;
@@ -562,7 +562,7 @@ function saveConfig() {
     manualSprints: document.getElementById('cfgSprints').value,
     hoursRows: hoursRowsDraft
       .filter(r => r.name && r.name.trim())
-      .map(r => ({ name: r.name.trim(), real: parseNum(r.real), est: parseNum(r.est), upgrade: parseNum(r.upgrade), q: r.q || '', planned: r.planned !== false })),
+      .map(r => ({ name: r.name.trim(), real: parseNum(r.real), est: parseNum(r.est), upgrade: parseNum(r.upgrade), q: r.q || '', planned: r.planned !== false, pinId: r.pinId || null })),
   };
   localStorage.setItem('adoGanttCfg2', JSON.stringify(cfg));
   document.getElementById('configOverlay').style.display = 'none';
@@ -1882,20 +1882,62 @@ function addHoursRow() {
 // Agrega una fila por cada Epic real del Gantt que todavía no esté en `rows`
 // (match exacto de título, sin importar mayúsculas). No pisa ni duplica filas
 // existentes — solo agrega las que faltan, con horas vacías para completar.
-function mergeEpicsIntoRows(rows) {
+// Reconcilia filas de horas contra las Epics reales de ADO POR ID, no por nombre:
+// si una Epic se renombra en ADO, la fila que ya estaba "pineada" a ese ID
+// actualiza su nombre en vez de quedar huérfana y generar una fila duplicada.
+// 1) filas ya pineadas: si la Epic sigue existiendo, se les actualiza el nombre.
+// 2) Epics sin pin todavía: se buscan por coincidencia de texto (igual que
+//    matchHoursToEpics) entre las filas sin pin, priorizando las que ya tienen
+//    datos cargados — así una fila vieja "adopta" el nuevo nombre en vez de
+//    quedar duplicada con una fila nueva vacía.
+// 3) Epics que no matchean ninguna fila: se agrega una fila nueva, ya pineada.
+function reconcileHoursRowsWithEpics(rows) {
   const epics = (workItems || []).filter(w => w.type === 'Epic');
-  const out = rows.slice();
+  const out = rows.map(r => ({ ...r }));
+  const claimedRows = new Set();
+  const claimedEpics = new Set();
+
+  out.forEach((r, i) => {
+    if (!r.pinId) return;
+    const ep = epics.find(e => e.id === r.pinId);
+    if (ep) { r.name = ep.title; claimedRows.add(i); claimedEpics.add(ep.id); }
+  });
+
   for (const ep of epics) {
-    const exists = out.some(r => (r.name || '').trim().toLowerCase() === ep.title.trim().toLowerCase());
-    if (!exists) out.push({ name: ep.title, real: '', est: '', upgrade: '', q: '', planned: true });
+    if (claimedEpics.has(ep.id)) continue;
+    const pt = normTokens(ep.title);
+    const epV2 = /\bV2\b/i.test(ep.title);
+    let bestIdx = -1, bestScore = 0;
+    out.forEach((r, i) => {
+      if (claimedRows.has(i) || !r.name) return;
+      const et = normTokens(r.name);
+      const rV2 = /\bV2\b/i.test(r.name);
+      let score = et.filter(t => pt.includes(t)).length;
+      if (epV2 !== rV2) score -= 5;
+      if (r.real || r.est) score += 0.5; // ante empate, prioriza la fila con datos ya cargados
+      if (score > bestScore) { bestScore = score; bestIdx = i; }
+    });
+    if (bestIdx >= 0) {
+      out[bestIdx].pinId = ep.id;
+      out[bestIdx].name = ep.title;
+      claimedRows.add(bestIdx);
+      claimedEpics.add(ep.id);
+    }
+  }
+
+  for (const ep of epics) {
+    if (claimedEpics.has(ep.id)) continue;
+    out.push({ name: ep.title, real: '', est: '', upgrade: '', q: '', planned: true, pinId: ep.id });
+    claimedEpics.add(ep.id);
   }
   return out;
 }
-// Se llama en cada carga/actualización del Gantt: agrega automáticamente las
-// Epics nuevas a cfg.hoursRows (persistido), igual que el árbol del Gantt se
-// actualiza solo. Si Config está abierto, refleja el cambio en la grilla visible.
+// Se llama en cada carga/actualización del Gantt: reconcilia cfg.hoursRows
+// contra las Epics reales (agrega nuevas, renombra las que cambiaron de
+// título en ADO), igual que el árbol del Gantt se actualiza solo. Si Config
+// está abierto, refleja el cambio en la grilla visible.
 function syncEpicsIntoHoursRows() {
-  cfg.hoursRows = mergeEpicsIntoRows(cfg.hoursRows || []);
+  cfg.hoursRows = reconcileHoursRowsWithEpics(cfg.hoursRows || []);
   localStorage.setItem('adoGanttCfg2', JSON.stringify(cfg));
   if (document.getElementById('configOverlay').style.display === 'flex') {
     hoursRowsDraft = cfg.hoursRows.map(r => ({ ...r }));
@@ -1904,7 +1946,7 @@ function syncEpicsIntoHoursRows() {
 }
 function loadEpicsIntoGrid() {
   const before = hoursRowsDraft.length;
-  hoursRowsDraft = mergeEpicsIntoRows(hoursRowsDraft.filter(r => r.name && r.name.trim()));
+  hoursRowsDraft = reconcileHoursRowsWithEpics(hoursRowsDraft.filter(r => r.name && r.name.trim()));
   renderHoursGrid();
   if (hoursRowsDraft.length === before) alert('Ya estaban todas las Epics cargadas en la grilla.');
 }
@@ -1960,6 +2002,12 @@ function matchHoursToEpics() {
   hoursByEpic = {};
   const epics = (fullTree || []).filter(n => n.type === 'Epic');
   for (const e of hoursData) {
+    // Si la fila está "pineada" a un ID real de ADO, se usa directo — sin esto,
+    // renombrar la Epic en ADO deja la fila huérfana y crea una duplicada.
+    if (e.pinId) {
+      const pinned = epics.find(ep => ep.id === e.pinId);
+      if (pinned) { e.epicId = pinned.id; e.epicNode = pinned; hoursByEpic[e.epicId] = e; continue; }
+    }
     const et = normTokens(e.name);
     const eV2 = /\bV2\b/i.test(e.name);
     let best = null, bestScore = 0;
@@ -2269,7 +2317,7 @@ function refreshHours() {
     // suma sobre lo consumido, no sobre el estimado viejo). Sin upgrade, el estimado
     // queda exactamente como se cargó — nunca se toca para "tapar" un sobrecosto.
     const est = upgradeHours > 0 ? Math.max(estBase, real) + upgradeHours : estBase;
-    return { extId: null, name: r.name, real, est, estBase, upgradeHours, manualQ: r.q || null, planned: r.planned !== false };
+    return { extId: null, name: r.name, real, est, estBase, upgradeHours, manualQ: r.q || null, planned: r.planned !== false, pinId: r.pinId || null };
   });
   matchHoursToEpics();
   if (activeTab === 'alto-nivel') renderAltoNivel();
