@@ -2145,7 +2145,7 @@ function renderAltoNivel() {
             <div class="an-sub">horas totales</div>
             ${e.upgradeHours ? `<div class="an-upgrade" title="Estimado ampliado de ${fmtHrs(e.estBase)} a ${fmtHrs(e.est)} hs">↑ ampliado +${fmtHrs(e.upgradeHours)} hs${badgeOriginal ? ` · vs. original <span class="an-badge-mini ${badgeOriginal.cls}">${badgeOriginal.text}</span>` : ''}</div>` : ''}
           </div>
-          ${badge ? `<span class="an-badge ${badge.cls}" title="% horas consumidas">${badge.text}</span>` : ''}
+          ${badge ? `<span class="an-badge ${badge.cls}" onmouseenter="showTip(event,'% horas consumidas')" onmousemove="moveTip(event)" onmouseleave="hideTip()">${badge.text}</span>` : ''}
         </div>
       </div>
     </div>`;
