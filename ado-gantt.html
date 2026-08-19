@@ -28,12 +28,13 @@ body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Robo
 .hg-table { width: 100%; border-collapse: collapse; font-size: 13px; table-layout: fixed; }
 .hg-table th { text-align: left; font-weight: 600; color: #888; text-transform: uppercase; font-size: 10px; letter-spacing: .5px; padding: 4px 6px; border-bottom: 1px solid #e2e4e9; }
 .hg-table td { padding: 4px; border-bottom: 1px solid #f0f1f3; }
-.hg-table th:nth-child(1), .hg-table td:nth-child(1) { width: 44%; }
-.hg-table th:nth-child(2), .hg-table td:nth-child(2) { width: 15%; }
-.hg-table th:nth-child(3), .hg-table td:nth-child(3) { width: 15%; }
-.hg-table th:nth-child(4), .hg-table td:nth-child(4) { width: 15%; }
+.hg-table th:nth-child(1), .hg-table td:nth-child(1) { width: 38%; }
+.hg-table th:nth-child(2), .hg-table td:nth-child(2) { width: 13%; }
+.hg-table th:nth-child(3), .hg-table td:nth-child(3) { width: 13%; }
+.hg-table th:nth-child(4), .hg-table td:nth-child(4) { width: 13%; }
 .hg-table th:nth-child(5), .hg-table td:nth-child(5) { width: 8%; }
-.hg-table th:nth-child(6), .hg-table td:nth-child(6) { width: 3%; }
+.hg-table th:nth-child(6), .hg-table td:nth-child(6) { width: 8%; }
+.hg-table th:nth-child(7), .hg-table td:nth-child(7) { width: 3%; }
 .hg-table input, .hg-table select { width: 100%; padding: 8px 10px; border: 1px solid #e2e4e9; border-radius: 6px; font-size: 13px; box-sizing: border-box; }
 .hg-table input:focus, .hg-table select:focus { outline: none; border-color: #2563eb; }
 .hg-table td:nth-child(2) input, .hg-table td:nth-child(3) input, .hg-table td:nth-child(4) input { text-align: right; }
@@ -368,7 +369,7 @@ a.ititle:hover { color: #2563eb; text-decoration: underline; }
       <label>Horas por etapa <span style="font-weight:400;text-transform:none">(cargá o editá los datos a mano en la grilla)</span></label>
       <table class="hg-table">
         <thead>
-          <tr><th>Etapa</th><th>Consumidas</th><th>Estimadas</th><th>Adicionales</th><th>Q</th><th></th></tr>
+          <tr><th>Etapa</th><th>Consumidas</th><th>Estimadas</th><th>Adicionales</th><th>Q</th><th title="Estaba en el alcance original">Planif.</th><th></th></tr>
         </thead>
         <tbody id="hoursGridBody"></tbody>
       </table>
@@ -510,7 +511,7 @@ function decodeShareData(str) {
 function shareHoursLink() {
   const data = {
     hoursRows: hoursRowsDraft.filter(r => r.name && r.name.trim())
-      .map(r => ({ name: r.name.trim(), real: parseNum(r.real), est: parseNum(r.est), upgrade: parseNum(r.upgrade), q: r.q || '' })),
+      .map(r => ({ name: r.name.trim(), real: parseNum(r.real), est: parseNum(r.est), upgrade: parseNum(r.upgrade), q: r.q || '', planned: r.planned !== false })),
     manualSprints: document.getElementById('cfgSprints').value,
   };
   const url = `${location.origin}${location.pathname}#horas=${encodeShareData(data)}`;
@@ -561,7 +562,7 @@ function saveConfig() {
     manualSprints: document.getElementById('cfgSprints').value,
     hoursRows: hoursRowsDraft
       .filter(r => r.name && r.name.trim())
-      .map(r => ({ name: r.name.trim(), real: parseNum(r.real), est: parseNum(r.est), upgrade: parseNum(r.upgrade), q: r.q || '' })),
+      .map(r => ({ name: r.name.trim(), real: parseNum(r.real), est: parseNum(r.est), upgrade: parseNum(r.upgrade), q: r.q || '', planned: r.planned !== false })),
   };
   localStorage.setItem('adoGanttCfg2', JSON.stringify(cfg));
   document.getElementById('configOverlay').style.display = 'none';
@@ -1850,11 +1851,14 @@ function renderHoursGrid() {
           <option value="Q4"${r.q === 'Q4' ? ' selected' : ''}>Q4</option>
         </select>
       </td>
+      <td style="text-align:center">
+        <input type="checkbox" title="Estaba en el alcance original" ${r.planned !== false ? 'checked' : ''} onchange="hoursRowsDraft[${i}].planned=this.checked" />
+      </td>
       <td><button type="button" class="hg-delbtn" onclick="removeHoursRow(${i})" title="Eliminar etapa">✕</button></td>
     </tr>`).join('');
 }
 function addHoursRow() {
-  hoursRowsDraft.push({ name: '', real: '', est: '', upgrade: '', q: '' });
+  hoursRowsDraft.push({ name: '', real: '', est: '', upgrade: '', q: '', planned: true });
   renderHoursGrid();
 }
 // Agrega una fila por cada Epic real del Gantt que todavía no esté en la grilla
@@ -1868,7 +1872,7 @@ function mergeEpicsIntoRows(rows) {
   const out = rows.slice();
   for (const ep of epics) {
     const exists = out.some(r => (r.name || '').trim().toLowerCase() === ep.title.trim().toLowerCase());
-    if (!exists) out.push({ name: ep.title, real: '', est: '', upgrade: '', q: '' });
+    if (!exists) out.push({ name: ep.title, real: '', est: '', upgrade: '', q: '', planned: true });
   }
   return out;
 }
@@ -2113,6 +2117,9 @@ function renderAltoNivel() {
   const desvPctOriginal = totEstBase ? Math.round(desvioOriginal / totEstBase * 1000) / 10 : 0;
   const desvClassOriginal = desvioOriginal > totEstBase * 0.05 ? 'bad' : (desvioOriginal > 0 ? 'warn' : 'ok');
   const projProg = projectProgress(hoursData);
+  const plannedOnly = hoursData.filter(e => e.planned);
+  const hasUnplanned = plannedOnly.length !== hoursData.length;
+  const projProgPlanned = hasUnplanned ? projectProgress(plannedOnly) : null;
 
   function rowHtml(e) {
     const m = stageMetrics(e);
@@ -2197,7 +2204,7 @@ function renderAltoNivel() {
         <div class="an-stat"><div class="lbl">Estimadas</div><div class="val">${fmtHrs(totEst)} hs</div>${totUpgrade ? `<div class="an-sub-stat">original: ${fmtHrs(totEstBase)} hs</div>` : ''}</div>
         <div class="an-stat"><div class="lbl">Consumidas</div><div class="val">${fmtHrs(totReal)} hs</div></div>
         <div class="an-stat"><div class="lbl">Desvío</div><div class="val ${desvClass}">${desvioTxt}</div>${totUpgrade ? `<div class="an-sub-stat">vs. original: <span class="${desvClassOriginal}">${desvioOriginal >= 0 ? '+' : ''}${fmtHrs(desvioOriginal)} hs (${desvPctOriginal >= 0 ? '+' : ''}${desvPctOriginal}%)</span></div>` : ''}</div>
-        <div class="an-stat"><div class="lbl">Avance</div><div class="val">${projProg != null ? projProg + '%' : '—'}</div></div>
+        <div class="an-stat"><div class="lbl">Avance</div><div class="val">${projProg != null ? projProg + '%' : '—'}</div>${hasUnplanned ? `<div class="an-sub-stat">original/planeado: ${projProgPlanned != null ? projProgPlanned + '%' : '—'}</div>` : ''}</div>
       </div>
       ${qHtml}
       <div class="an-footer">
@@ -2247,7 +2254,7 @@ function refreshHours() {
     // suma sobre lo consumido, no sobre el estimado viejo). Sin upgrade, el estimado
     // queda exactamente como se cargó — nunca se toca para "tapar" un sobrecosto.
     const est = upgradeHours > 0 ? Math.max(estBase, real) + upgradeHours : estBase;
-    return { extId: null, name: r.name, real, est, estBase, upgradeHours, manualQ: r.q || null };
+    return { extId: null, name: r.name, real, est, estBase, upgradeHours, manualQ: r.q || null, planned: r.planned !== false };
   });
   matchHoursToEpics();
   if (activeTab === 'alto-nivel') renderAltoNivel();
