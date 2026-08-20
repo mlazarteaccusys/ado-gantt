@@ -2123,17 +2123,17 @@ function stageProgress(e) {
   return epicDisplayState(e.epicNode) === 'Closed' ? 100 : (e.epicNode.progress || 0);
 }
 // Avance global ponderado por horas estimadas: Σ(est × progreso) / Σ(est)
+// Promedio simple del avance de cada Epic (no ponderado por horas): cada etapa
+// pesa lo mismo sin importar su estimado, así el número no depende de qué tan
+// precisas fueron las estimaciones de horas.
 function projectProgress(entries) {
-  let num = 0, den = 0;
+  let sum = 0, count = 0;
   for (const e of entries) {
     const p = stageProgress(e);
     if (p === null) continue;
-    // Pondera por el estimado ORIGINAL, no el ampliado: cargar un upgrade no debe
-    // mover el avance general del proyecto, solo el trabajo hecho lo mueve.
-    const w = e.estBase != null ? e.estBase : e.est;
-    num += w * p; den += w;
+    sum += p; count++;
   }
-  return den ? Math.round(num / den) : null;
+  return count ? Math.round(sum / count) : null;
 }
 
 // Métricas ejecutivas de una etapa: avance, % gastado, eficiencia (avance/gasto)
