@@ -80,6 +80,9 @@ body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Robo
 .filter-menu { position: relative; display: inline-flex; }
 #filterBtn { display: inline-flex; align-items: center; gap: 6px; }
 #filterBtn.filtered { border-color: #2563eb; color: #2563eb; }
+#depBtn.active { border-color: #7c3aed; color: #7c3aed; background: #f5f3ff; }
+.dep-svg { position: absolute; top: 0; left: 0; pointer-events: none; z-index: 5; }
+.dep-line { fill: none; stroke: #7c3aed; stroke-width: 1.6; opacity: .75; }
 #filterBtn .caret { opacity: .55; font-size: 10px; }
 .filter-badge { background: #eef2ff; color: #4338ca; font-size: 10px; font-weight: 700; padding: 1px 7px; border-radius: 999px; }
 .filter-pop { position: absolute; top: calc(100% + 6px); left: 0; z-index: 150; min-width: 200px; background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; box-shadow: 0 12px 30px rgba(16,24,40,.14); padding: 6px; display: none; }
@@ -457,6 +460,8 @@ a.ititle:hover { color: #2563eb; text-decoration: underline; }
       </div>
     </div>
   </div>
+  <div class="sep"></div>
+  <button class="btn" id="depBtn" onclick="toggleDependencies()" title="Mostrar dependencias entre US/Mejoras técnicas (link Predecessor-Successor de ADO)">🔗 Dependencias</button>
   </div>
   <div class="spacer"></div>
   <span class="last-update" id="lastUpdate"></span>
@@ -497,6 +502,8 @@ let DAY_W = 28;
 let tlStart = null, tlDays = 0;
 let timeAxis = 'sprint';   // 'sprint' | 'month' — eje del encabezado del timeline
 let zoomPct = 100;         // zoom horizontal del timeline (%)
+let showDependencies = false;   // toggle "🔗 Dependencias"
+let dependencyEdges = null;     // null = todavía no se pidieron a ADO; [] = pedidas, ninguna relevante
 
 // ─── Compartir horas por link ──────────────────────────────────────────────────
 // La grilla de horas y los sprints manuales viajan codificados en el hash de la
@@ -806,6 +813,28 @@ async function fetchItemsByIds(ids) {
     raw.push(...(d.value || []));
   }
   return raw;
+}
+
+// Trae los links "Predecessor-Successor" (System.LinkTypes.Dependency) de una
+// lista de IDs. Devuelve pares {from, to} donde `from` debe terminar antes de
+// que empiece `to` (from = predecessor, to = successor). Solo se usa el lado
+// "Forward" del link — el "Reverse" es el mismo vínculo visto desde el otro
+// item, ya viene duplicado si se recorren todos los IDs.
+async function fetchDependencyEdges(ids) {
+  const edges = [];
+  for (let i = 0; i < ids.length; i += 200) {
+    const chunk = ids.slice(i, i + 200);
+    const d = await apiGet(`${base()}/_apis/wit/workitems?ids=${chunk.join(',')}&$expand=relations&api-version=7.1`);
+    for (const it of (d.value || [])) {
+      for (const rel of (it.relations || [])) {
+        if (rel.rel !== 'System.LinkTypes.Dependency-Forward') continue;
+        const m = String(rel.url || '').match(/\/workItems\/(\d+)$/i);
+        if (!m) continue;
+        edges.push({ from: it.id, to: parseInt(m[1]) });
+      }
+    }
+  }
+  return edges;
 }
 
 // Trae los IDs que pasaron alguna vez por "Reopened" (operador EVER de WIQL, una sola query)
@@ -1482,8 +1511,13 @@ function render() {
   const todayLine = '';
 
   // ── Row HTML ────────────────────────────────────────────────────────────────
-  let leftRows = '', rightRows = '';
+  // barGeom/rowIndexById: se completan durante el loop para poder dibujar las
+  // flechas de dependencia después (necesitan la posición en px de cada barra).
+  const barGeom = {};
+  const rowIndexById = {};
+  let leftRows = '', rightRows = '', rowIdx = 0;
   for (const item of rows) {
+    rowIndexById[item.id] = rowIdx++;
     const pad = item.depth * 16 + 6;
     const hasKids = item.hasVisibleKids;
     const isCol = collapsed.has(item.id);
@@ -1535,6 +1569,7 @@ function render() {
       const left = px(doff(item.startDate));
       const barDays = Math.max(doff(item.endDate) - doff(item.startDate) + 1, 1);
       const w = Math.max(px(barDays), 6);
+      barGeom[item.id] = { left, width: w };
       const progW = w * item.progress / 100;
       const dashedStyle = item.hasExplicitDates ? '' : 'opacity:0.75;';
       if (isQuarter) {
@@ -1570,6 +1605,7 @@ function render() {
       const left = px(doff(item.iter.startDate));
       const days = Math.max(doff(item.iter.endDate) - doff(item.iter.startDate) + 1, 1);
       const w = Math.max(px(days), 6);
+      barGeom[item.id] = { left, width: w };
       barHtml = `<div class="gbar-dash" style="left:${left}px;width:${w}px"
         onclick="window.open(wiUrl(${item.id}),'_blank','noopener')"
         onmouseenter="showTip(event,'${esc(tipText).replace(/\n/g,'&#10;')}')" onmouseleave="hideTip()">
@@ -1578,6 +1614,32 @@ function render() {
     }
 
     rightRows += `<div class="t-row" style="width:${totalW}px">${barHtml}</div>`;
+  }
+
+  // ── Flechas de dependencia (Predecessor→Successor) ──────────────────────────
+  // Solo entre items visibles y con barra dibujada; si el toggle está apagado o
+  // todavía no se pidieron a ADO, no se dibuja nada.
+  let depSvgHtml = '';
+  if (showDependencies && dependencyEdges && dependencyEdges.length) {
+    const ROW_H = 40;
+    let paths = '';
+    for (const { from, to } of dependencyEdges) {
+      const gFrom = barGeom[from], gTo = barGeom[to];
+      const riFrom = rowIndexById[from], riTo = rowIndexById[to];
+      if (!gFrom || !gTo || riFrom === undefined || riTo === undefined) continue;
+      const x1 = gFrom.left + gFrom.width, y1 = riFrom * ROW_H + ROW_H / 2;
+      const x2 = gTo.left, y2 = riTo * ROW_H + ROW_H / 2;
+      const midX = x1 + 10;
+      paths += `<path class="dep-line" marker-end="url(#depArrow)" d="M ${x1} ${y1} L ${midX} ${y1} L ${midX} ${y2} L ${x2} ${y2}" />`;
+    }
+    if (paths) {
+      depSvgHtml = `<svg class="dep-svg" width="${totalW}" height="${rows.length * ROW_H}">
+        <defs><marker id="depArrow" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto" markerUnits="strokeWidth">
+          <path d="M0,0 L6,3 L0,6 Z" fill="#7c3aed" />
+        </marker></defs>
+        ${paths}
+      </svg>`;
+    }
   }
 
   mount.innerHTML = `
@@ -1608,6 +1670,7 @@ function render() {
             ${timeAxis === 'month' ? monthBgHtml : sprintBgHtml}
             ${todayLine}
             <div id="rightBody">${rightRows}</div>
+            ${depSvgHtml}
           </div>
         </div>
       </div>
@@ -2314,6 +2377,34 @@ function setTimeAxis(mode) {
   if (timeAxis === mode) return;
   timeAxis = mode;
   document.querySelectorAll('#axisToggle .axis-opt').forEach(b => b.classList.toggle('active', b.dataset.axis === mode));
+  rerenderKeepScroll();
+}
+
+// Muestra/oculta las flechas de dependencia (Predecessor-Successor de ADO)
+// entre User Stories/Technical Tasks. Se piden a ADO recién la primera vez
+// que se activa (no en cada carga), y quedan cacheadas en dependencyEdges.
+async function toggleDependencies() {
+  showDependencies = !showDependencies;
+  const btn = document.getElementById('depBtn');
+  if (btn) btn.classList.toggle('active', showDependencies);
+  if (showDependencies && dependencyEdges === null) {
+    if (btn) { btn.disabled = true; btn.textContent = '⏳ Cargando dependencias…'; }
+    try {
+      const ids = workItems.map(w => w.id);
+      const raw = await fetchDependencyEdges(ids);
+      const byId = new Map(workItems.map(w => [w.id, w]));
+      const okType = t => t === 'User Story' || t === 'Technical Task';
+      dependencyEdges = raw.filter(e => {
+        const a = byId.get(e.from), b = byId.get(e.to);
+        return a && b && okType(a.type) && okType(b.type);
+      });
+    } catch (e) {
+      console.warn('No se pudieron cargar las dependencias:', e);
+      dependencyEdges = [];
+    } finally {
+      if (btn) { btn.disabled = false; btn.textContent = '🔗 Dependencias'; }
+    }
+  }
   rerenderKeepScroll();
 }
 
