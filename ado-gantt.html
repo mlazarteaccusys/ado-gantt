@@ -81,7 +81,9 @@ body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Robo
 #filterBtn { display: inline-flex; align-items: center; gap: 6px; }
 #filterBtn.filtered { border-color: #2563eb; color: #2563eb; }
 #depBtn.active { border-color: #7c3aed; color: #7c3aed; background: #f5f3ff; }
-.dep-svg { position: absolute; top: 0; left: 0; pointer-events: none; z-index: 5; }
+.dep-svg { position: absolute; top: 0; left: 0; pointer-events: none; }
+.dep-svg.behind { z-index: 3; }  /* debajo de .gbar (z-index:5): el tramo que sale de la cajita predecesora queda "tapado" por las barras, en vez de cruzarlas por encima */
+.dep-svg.front  { z-index: 6; }  /* encima de .gbar: solo la puntita de flecha que entra a la cajita sucesora */
 .dep-line { fill: none; stroke: #7c3aed; stroke-width: 1.6; opacity: .75; }
 #filterBtn .caret { opacity: .55; font-size: 10px; }
 .filter-badge { background: #eef2ff; color: #4338ca; font-size: 10px; font-weight: 700; padding: 1px 7px; border-radius: 999px; }
@@ -1621,8 +1623,8 @@ function render() {
   // todavía no se pidieron a ADO, no se dibuja nada.
   let depSvgHtml = '';
   if (showDependencies && dependencyEdges && dependencyEdges.length) {
-    const ROW_H = 40;
-    let paths = '';
+    const ROW_H = 40, TIP_LEN = 12;
+    let pathsBehind = '', pathsFront = '';
     for (const { from, to } of dependencyEdges) {
       const gFrom = barGeom[from], gTo = barGeom[to];
       const riFrom = rowIndexById[from], riTo = rowIndexById[to];
@@ -1630,15 +1632,21 @@ function render() {
       const x1 = gFrom.left + gFrom.width, y1 = riFrom * ROW_H + ROW_H / 2;
       const x2 = gTo.left, y2 = riTo * ROW_H + ROW_H / 2;
       const midX = x1 + 10;
-      paths += `<path class="dep-line" marker-end="url(#depArrow)" d="M ${x1} ${y1} L ${midX} ${y1} L ${midX} ${y2} L ${x2} ${y2}" />`;
+      // Tramo de fondo: sale de la cajita predecesora y va hasta poco antes de
+      // la sucesora — queda por detrás de las barras (z-index menor), así no
+      // "atraviesa" cajitas por encima, solo se ve en los huecos entre ellas.
+      const tipStart = Math.max(x2 - TIP_LEN, midX);
+      pathsBehind += `<path class="dep-line" d="M ${x1} ${y1} L ${midX} ${y1} L ${midX} ${y2} L ${tipStart} ${y2}" />`;
+      // Puntita final con la flecha: por delante de las barras, para que se
+      // vea entrando a la cajita sucesora (eso sí queda bien que tape el borde).
+      pathsFront += `<path class="dep-line" marker-end="url(#depArrow)" d="M ${tipStart} ${y2} L ${x2} ${y2}" />`;
     }
-    if (paths) {
-      depSvgHtml = `<svg class="dep-svg" width="${totalW}" height="${rows.length * ROW_H}">
-        <defs><marker id="depArrow" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto" markerUnits="strokeWidth">
-          <path d="M0,0 L6,3 L0,6 Z" fill="#7c3aed" />
-        </marker></defs>
-        ${paths}
-      </svg>`;
+    if (pathsBehind || pathsFront) {
+      const defs = `<defs><marker id="depArrow" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto" markerUnits="strokeWidth">
+        <path d="M0,0 L6,3 L0,6 Z" fill="#7c3aed" />
+      </marker></defs>`;
+      depSvgHtml = `<svg class="dep-svg behind" width="${totalW}" height="${rows.length * ROW_H}">${defs}${pathsBehind}</svg>
+        <svg class="dep-svg front" width="${totalW}" height="${rows.length * ROW_H}">${pathsFront}</svg>`;
     }
   }
 
@@ -1741,8 +1749,14 @@ function initResizeHandle() {
         const w = Math.max(min, Math.min(900, startW + ev.clientX - startX));
         colWidths[col] = w;
         document.documentElement.style.setProperty(col, w + 'px');
+        const newLW = totalLeftW() + 'px';
         const gLeft = document.querySelector('.g-left');
-        if (gLeft) gLeft.style.width = totalLeftW() + 'px';
+        if (gLeft) gLeft.style.width = newLW;
+        // El panel izquierdo del encabezado (.gh-left) queda con el ancho viejo
+        // si no se actualiza acá también — eso desalinea el header de sprints
+        // respecto al cuerpo y se ve "roto" al hacer scroll horizontal.
+        const ghLeft = document.querySelector('.gh-left');
+        if (ghLeft) ghLeft.style.width = newLW;
       };
       const onUp = () => {
         handle.classList.remove('dragging');
