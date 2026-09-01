@@ -2392,11 +2392,8 @@ function refreshHours() {
     const upgradeHours = r.upgrade || 0;
     const estBase = r.est || 0;
     const real = r.real || 0;
-    // Solo cuando HAY upgrade: el nuevo total no puede ser menor a lo ya consumido
-    // (si el gasto ya superaba el estimado original antes de pedirlo, el upgrade se
-    // suma sobre lo consumido, no sobre el estimado viejo). Sin upgrade, el estimado
-    // queda exactamente como se cargó — nunca se toca para "tapar" un sobrecosto.
-    const est = upgradeHours > 0 ? Math.max(estBase, real) + upgradeHours : estBase;
+    // El estimado ampliado es simplemente: estimado original + horas adicionales
+    const est = estBase + upgradeHours;
     return { extId: null, name: r.name, real, est, estBase, upgradeHours, manualQ: r.q || null, planned: r.planned !== false, pinId: r.pinId || null };
   });
   matchHoursToEpics();
