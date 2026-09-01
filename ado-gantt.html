@@ -396,6 +396,7 @@ a.ititle:hover { color: #2563eb; text-decoration: underline; }
   <div class="axis-toggle" id="tabToggle">
     <button class="axis-opt" data-tab="alto-nivel" onclick="setActiveTab('alto-nivel')">Control de Proyecto</button>
     <button class="axis-opt active" data-tab="gantt" onclick="setActiveTab('gantt')">Gantt</button>
+    <button class="axis-opt" data-tab="reopen" onclick="setActiveTab('reopen')">Retrabajos</button>
   </div>
   <div class="sep"></div>
   <div class="team-select-wrap">
@@ -469,6 +470,7 @@ a.ititle:hover { color: #2563eb; text-decoration: underline; }
 <!-- Page -->
 <div class="page">
   <div id="altoNivelPanel" style="display:none"></div>
+  <div id="reopenPanel" style="display:none"></div>
   <div id="mount"></div>
 </div>
 
@@ -1878,7 +1880,7 @@ function collapseOneLevel() {
 // ─── Horas por etapa (reporte semanal) ───────────────────────────────────────
 let hoursData = [];       // [{extId, name, est, real, epicId}]
 let hoursByEpic = {};     // {epicId: entry}
-let activeTab = 'gantt';           // 'gantt' | 'alto-nivel'
+let activeTab = 'gantt';           // 'gantt' | 'alto-nivel' | 'reopen'
 let collapsedQuarters = new Set(); // Qs colapsados en la vista Alto Nivel (vacío = todos expandidos)
 
 function setActiveTab(tab) {
@@ -1886,11 +1888,13 @@ function setActiveTab(tab) {
   document.querySelectorAll('#tabToggle .axis-opt').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
   document.getElementById('mount').style.display = tab === 'gantt' ? '' : 'none';
   document.getElementById('altoNivelPanel').style.display = tab === 'alto-nivel' ? 'block' : 'none';
+  document.getElementById('reopenPanel').style.display = tab === 'reopen' ? 'block' : 'none';
   const gc = document.getElementById('ganttOnlyControls');
   const sep0 = document.getElementById('ganttSep0');
   if (gc) gc.style.display = tab === 'gantt' ? 'contents' : 'none';
   if (sep0) sep0.style.display = tab === 'gantt' ? '' : 'none';
   if (tab === 'alto-nivel') renderAltoNivel();
+  if (tab === 'reopen') renderReopen();
   updateTopbarH();
 }
 
@@ -2329,6 +2333,43 @@ function renderAltoNivel() {
         <span>ef = avance% ÷ consumo% · 1.00 significa avanzar al ritmo planificado</span>
       </div>
     </div>`;
+}
+
+function renderReopen() {
+  const panel = document.getElementById('reopenPanel');
+  if (!reopenedIds.size) {
+    panel.innerHTML = '<div style="padding: 20px; text-align: center; color: #888;">No hay retrabajos registrados</div>';
+    return;
+  }
+  const rows = workItems.filter(w => reopenedIds.has(w.id)).map(w => `
+    <tr>
+      <td><a href="${wiUrl(w.id)}" target="_blank" style="color: #2563eb; text-decoration: none;">${w.id}</a></td>
+      <td><strong>${esc(w.title)}</strong></td>
+      <td>${w.type}</td>
+      <td>${esc(w.assignee || '—')}</td>
+      <td>${w.state}</td>
+    </tr>
+  `).join('');
+  panel.innerHTML = `
+    <div style="padding: 20px;">
+      <h2>Retrabajos (Reopen)</h2>
+      <p style="color: #666; margin-bottom: 16px;">Tickets que pasaron por estado "Reopen" — trabajo que fue reabierto después de estar completado</p>
+      <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
+        <thead>
+          <tr style="border-bottom: 2px solid #e2e4e9; background: #f9fafb;">
+            <th style="padding: 8px; text-align: left; font-weight: 600; color: #666;">ID</th>
+            <th style="padding: 8px; text-align: left; font-weight: 600; color: #666;">Título</th>
+            <th style="padding: 8px; text-align: left; font-weight: 600; color: #666;">Tipo</th>
+            <th style="padding: 8px; text-align: left; font-weight: 600; color: #666;">Asignado</th>
+            <th style="padding: 8px; text-align: left; font-weight: 600; color: #666;">Estado</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${rows}
+        </tbody>
+      </table>
+    </div>
+  `;
 }
 
 // ─── Zoom del timeline ───────────────────────────────────────────────────────
