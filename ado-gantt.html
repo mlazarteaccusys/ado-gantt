@@ -366,11 +366,6 @@ a.ititle:hover { color: #2563eb; text-decoration: underline; }
       </div>
     </div>
     <div class="config-field">
-      <label>Sprints manuales <span style="font-weight:400;text-transform:none">(formato: Nombre,DD/MM/YYYY,DD/MM/YYYY — uno por línea)</span></label>
-      <textarea id="cfgSprints" rows="6" style="width:100%;padding:8px 12px;border:1px solid #ddd;border-radius:6px;font-size:12px;font-family:monospace;resize:vertical"></textarea>
-      <small>Si está completo, se usa en lugar de los sprints de ADO. Borrar para volver a ADO.</small>
-    </div>
-    <div class="config-field">
       <label>Horas por etapa <span style="font-weight:400;text-transform:none">(cargá o editá los datos a mano en la grilla)</span></label>
       <table class="hg-table">
         <thead>
@@ -382,7 +377,7 @@ a.ititle:hover { color: #2563eb; text-decoration: underline; }
       <button type="button" class="hg-addbtn" onclick="loadEpicsIntoGrid()">📥 Cargar Epics del Gantt</button>
       <button type="button" class="hg-addbtn" onclick="shareHoursLink()" id="shareHoursBtn">🔗 Copiar link con estas horas</button>
       <small>"Adicionales" son horas de upgrade de alcance que se suman al estimado (se muestran como "ampliado" en Alto Nivel).</small>
-      <small>El link de arriba lleva la grilla de horas (y los sprints manuales) para que quien lo abra la vea igual — nunca incluye tu PAT.</small>
+      <small>El link de arriba lleva la grilla de horas para que quien lo abra la vea igual — nunca incluye tu PAT.</small>
       <details style="margin-top:10px">
         <summary style="cursor:pointer;font-size:12px;color:#666">Importar desde el reporte semanal pegado (opcional)</summary>
         <textarea id="cfgHoursImport" rows="5" style="width:100%;margin-top:8px;padding:8px 12px;border:1px solid #ddd;border-radius:6px;font-size:12px;font-family:monospace;resize:vertical" placeholder="121930 - ACCUSYS-PROBATCH NV-FASE 0-Core Estable&#10;645,5 de 360"></textarea>
@@ -508,9 +503,9 @@ let showDependencies = false;   // toggle "🔗 Dependencias"
 let dependencyEdges = null;     // null = todavía no se pidieron a ADO; [] = pedidas, ninguna relevante
 
 // ─── Compartir horas por link ──────────────────────────────────────────────────
-// La grilla de horas y los sprints manuales viajan codificados en el hash de la
+// La grilla de horas viaja codificada en el hash de la
 // URL (nunca el PAT/org/proyecto, que son credenciales y quedan solo en este
-// navegador). Al abrir un link con #horas=..., se importan a la config local.
+// navegador). Al abrir un link con #horas=..., se importa a la config local.
 function encodeShareData(data) {
   return btoa(unescape(encodeURIComponent(JSON.stringify(data))));
 }
@@ -521,7 +516,6 @@ function shareHoursLink() {
   const data = {
     hoursRows: hoursRowsDraft.filter(r => r.name && r.name.trim())
       .map(r => ({ name: r.name.trim(), real: parseNum(r.real), est: parseNum(r.est), upgrade: parseNum(r.upgrade), q: r.q || '', planned: r.planned !== false, pinId: r.pinId || null })),
-    manualSprints: document.getElementById('cfgSprints').value,
   };
   const url = `${location.origin}${location.pathname}#horas=${encodeShareData(data)}`;
   const btn = document.getElementById('shareHoursBtn');
@@ -538,7 +532,6 @@ function importSharedHoursFromUrl() {
   let cfg2;
   try { cfg2 = JSON.parse(localStorage.getItem('adoGanttCfg2') || '{}'); } catch(e) { cfg2 = {}; }
   if (data.hoursRows) cfg2.hoursRows = data.hoursRows;
-  if (data.manualSprints !== undefined) cfg2.manualSprints = data.manualSprints;
   localStorage.setItem('adoGanttCfg2', JSON.stringify(cfg2));
   history.replaceState(null, '', location.pathname + location.search); // limpia el hash, ya se guardó
   return true;
@@ -568,7 +561,6 @@ function saveConfig() {
     team: document.getElementById('cfgTeam').value.trim(),
     dayW: parseInt(document.getElementById('cfgDayW').value) || 28,
     maxItems: parseInt(document.getElementById('cfgMax').value) || 500,
-    manualSprints: document.getElementById('cfgSprints').value,
     hoursRows: hoursRowsDraft
       .filter(r => r.name && r.name.trim())
       .map(r => ({ name: r.name.trim(), real: parseNum(r.real), est: parseNum(r.est), upgrade: parseNum(r.upgrade), q: r.q || '', planned: r.planned !== false, pinId: r.pinId || null })),
@@ -585,7 +577,6 @@ function showConfig() {
   document.getElementById('cfgPat').value = cfg.pat || '';
   document.getElementById('cfgDayW').value = cfg.dayW || 28;
   document.getElementById('cfgMax').value = cfg.maxItems || 500;
-  document.getElementById('cfgSprints').value = cfg.manualSprints !== undefined ? cfg.manualSprints : MANUAL_SPRINTS_DEFAULT;
   // Migración: si nunca se guardó la grilla pero sí hay un reporte viejo pegado, precargarla desde ahí.
   const legacyRows = (!cfg.hoursRows || !cfg.hoursRows.length) && cfg.hoursText
     ? parseHours(cfg.hoursText).map(e => ({ name: e.name, real: e.real, est: e.est, upgrade: '' }))
@@ -693,9 +684,8 @@ async function onTeamChange(teamName) {
 }
 
 // ─── Horas por etapa: mock por defecto (editable) ─────────────────────────────
-// Igual que MANUAL_SPRINTS_DEFAULT: son datos de arranque para que la grilla
-// nunca aparezca vacía (ej. primera vez en un navegador nuevo), pero cfg.hoursRows
-// los pisa en cuanto el usuario guarda Config una vez.
+// Datos de arranque para que la grilla nunca aparezca vacía (ej. primera vez en un navegador nuevo),
+// pero cfg.hoursRows los pisa en cuanto el usuario guarda Config una vez.
 const DEFAULT_HOURS_ROWS = [
   { name: 'Fase 0: Core Estable', real: 645.5, est: 360, upgrade: 0, q: '', planned: true },
   { name: 'UX/UI Web Modernization: New look and feel Probatch', real: 665, est: 605, upgrade: 0, q: '', planned: true },
@@ -706,37 +696,6 @@ const DEFAULT_HOURS_ROWS = [
   { name: 'UX/UI Web Modernization: New Planificador', real: 0, est: 90, upgrade: 70, q: '', planned: true },
   { name: 'UX/UI Web Modernization: Configuración', real: 0, est: 232, upgrade: 0, q: '', planned: false },
 ];
-
-// ─── Sprint manual override ────────────────────────────────────────────────────
-const MANUAL_SPRINTS_DEFAULT = `Sprint 1,16/03/2026,27/03/2026
-Sprint 2,30/03/2026,10/04/2026
-Sprint 3,13/04/2026,24/04/2026
-Sprint 4,27/04/2026,08/05/2026
-Sprint 5,11/05/2026,22/05/2026
-Sprint 6,25/05/2026,05/06/2026
-Sprint 7,08/06/2026,19/06/2026
-Sprint 8,22/06/2026,03/07/2026
-Sprint 9,06/07/2026,17/07/2026
-Sprint 10,20/07/2026,31/07/2026
-Sprint 11,03/08/2026,14/08/2026
-Sprint 12,17/08/2026,28/08/2026
-Sprint 13,31/08/2026,11/09/2026
-Sprint 14,14/09/2026,25/09/2026`;
-
-function parseManualSprints(text) {
-  if (!text || !text.trim()) return [];
-  return text.trim().split('\n').map((line, i) => {
-    const parts = line.split(',').map(s => s.trim());
-    if (parts.length < 3) return null;
-    const [name, startStr, endStr] = parts;
-    const parseLocal = s => {
-      const [d, m, y] = s.split('/').map(Number);
-      return new Date(y, m - 1, d, 12, 0, 0);
-    };
-    return { id: `manual-${i}`, name, path: name,
-      startDate: parseLocal(startStr), endDate: parseLocal(endStr) };
-  }).filter(Boolean);
-}
 
 // ─── Fetch iterations ──────────────────────────────────────────────────────────
 async function fetchIterations() {
@@ -780,13 +739,6 @@ async function fetchIterations() {
     walk(d);
     if (flat.length) return flat.sort((a,b) => a.startDate - b.startDate);
   } catch(e) { /* ignore */ }
-
-  // 3. Last resort: manual sprints override
-  const manualText = cfg.manualSprints !== undefined ? cfg.manualSprints : MANUAL_SPRINTS_DEFAULT;
-  if (manualText && manualText.trim()) {
-    const manual = parseManualSprints(manualText);
-    if (manual.length) return manual;
-  }
 
   return [];
 }
