@@ -567,7 +567,14 @@ function saveConfig() {
   };
   localStorage.setItem('adoGanttCfg2', JSON.stringify(cfg));
   document.getElementById('configOverlay').style.display = 'none';
-  loadData();
+  loadData().then(() => {
+    const btn = document.querySelector('.config-btn');
+    if (btn) {
+      const orig = btn.textContent;
+      btn.textContent = '✓ Guardado';
+      setTimeout(() => btn.textContent = orig, 2000);
+    }
+  });
 }
 
 function showConfig() {
