@@ -28,14 +28,15 @@ body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Robo
 .hg-table { width: 100%; border-collapse: collapse; font-size: 13px; table-layout: fixed; }
 .hg-table th { text-align: left; font-weight: 600; color: #888; text-transform: uppercase; font-size: 10px; letter-spacing: .5px; padding: 4px 6px; border-bottom: 1px solid #e2e4e9; }
 .hg-table td { padding: 4px; border-bottom: 1px solid #f0f1f3; }
-.hg-table th:nth-child(1), .hg-table td:nth-child(1) { width: 30%; }
-.hg-table th:nth-child(2), .hg-table td:nth-child(2) { width: 11%; }
-.hg-table th:nth-child(3), .hg-table td:nth-child(3) { width: 11%; }
-.hg-table th:nth-child(4), .hg-table td:nth-child(4) { width: 11%; }
-.hg-table th:nth-child(5), .hg-table td:nth-child(5) { width: 7%; }
-.hg-table th:nth-child(6), .hg-table td:nth-child(6) { width: 7%; }
-.hg-table th:nth-child(7), .hg-table td:nth-child(7) { width: 16%; }
-.hg-table th:nth-child(8), .hg-table td:nth-child(8) { width: 3%; }
+.hg-table th:nth-child(1), .hg-table td:nth-child(1) { width: 26%; }
+.hg-table th:nth-child(2), .hg-table td:nth-child(2) { width: 10%; }
+.hg-table th:nth-child(3), .hg-table td:nth-child(3) { width: 10%; }
+.hg-table th:nth-child(4), .hg-table td:nth-child(4) { width: 10%; }
+.hg-table th:nth-child(5), .hg-table td:nth-child(5) { width: 6%; }
+.hg-table th:nth-child(6), .hg-table td:nth-child(6) { width: 6%; }
+.hg-table th:nth-child(7), .hg-table td:nth-child(7) { width: 15%; }
+.hg-table th:nth-child(8), .hg-table td:nth-child(8) { width: 14%; }
+.hg-table th:nth-child(9), .hg-table td:nth-child(9) { width: 3%; }
 .hg-table input, .hg-table select { width: 100%; padding: 8px 10px; border: 1px solid #e2e4e9; border-radius: 6px; font-size: 13px; box-sizing: border-box; }
 .hg-table input:focus, .hg-table select:focus { outline: none; border-color: #2563eb; }
 .hg-table td:nth-child(2) input, .hg-table td:nth-child(3) input, .hg-table td:nth-child(4) input { text-align: right; }
@@ -385,7 +386,7 @@ a.ititle:hover { color: #2563eb; text-decoration: underline; }
       <label>Horas por etapa <span style="font-weight:400;text-transform:none">(cargá o editá los datos a mano en la grilla)</span></label>
       <table class="hg-table">
         <thead>
-          <tr><th>Etapa</th><th>Consumidas</th><th>Estimadas</th><th>Adicionales</th><th>Q</th><th title="Estaba en el alcance original">Planif.</th><th title="En qué actualización del ambiente de QA se prueba esta etapa">Versión QA</th><th></th></tr>
+          <tr><th>Etapa</th><th>Consumidas</th><th>Estimadas</th><th>Adicionales</th><th>Q</th><th title="Estaba en el alcance original">Planif.</th><th title="En qué actualización del ambiente de QA se prueba esta etapa">Versión QA</th><th title="Cuánto dura el testing a partir de esa versión">Duración QA</th><th></th></tr>
         </thead>
         <tbody id="hoursGridBody"></tbody>
       </table>
@@ -534,7 +535,7 @@ function decodeShareData(str) {
 function shareHoursLink() {
   const data = {
     hoursRows: hoursRowsDraft.filter(r => r.name && r.name.trim())
-      .map(r => ({ name: r.name.trim(), real: parseNum(r.real), est: parseNum(r.est), upgrade: parseNum(r.upgrade), q: r.q || '', planned: r.planned !== false, pinId: r.pinId || null, qaVersion: r.qaVersion || '' })),
+      .map(r => ({ name: r.name.trim(), real: parseNum(r.real), est: parseNum(r.est), upgrade: parseNum(r.upgrade), q: r.q || '', planned: r.planned !== false, pinId: r.pinId || null, qaVersion: r.qaVersion || '', qaDurationWeeks: parseInt(r.qaDurationWeeks) || 0 })),
   };
   const url = `${location.origin}${location.pathname}#horas=${encodeShareData(data)}`;
   const btn = document.getElementById('shareHoursBtn');
@@ -583,7 +584,7 @@ function saveConfig() {
     qaVersionsText: document.getElementById('cfgQaVersions').value,
     hoursRows: hoursRowsDraft
       .filter(r => r.name && r.name.trim())
-      .map(r => ({ name: r.name.trim(), real: parseNum(r.real), est: parseNum(r.est), upgrade: parseNum(r.upgrade), q: r.q || '', planned: r.planned !== false, pinId: r.pinId || null, qaVersion: r.qaVersion || '' })),
+      .map(r => ({ name: r.name.trim(), real: parseNum(r.real), est: parseNum(r.est), upgrade: parseNum(r.upgrade), q: r.q || '', planned: r.planned !== false, pinId: r.pinId || null, qaVersion: r.qaVersion || '', qaDurationWeeks: parseInt(r.qaDurationWeeks) || 0 })),
   };
   localStorage.setItem('adoGanttCfg2', JSON.stringify(cfg));
   document.getElementById('configOverlay').style.display = 'none';
@@ -1624,16 +1625,20 @@ function render() {
           </div>`;
         }
       }
-      // Barra de QA: desde que termina el desarrollo hasta la versión de ambiente asignada
+      // Barra de QA: desde que termina el desarrollo hasta la versión de ambiente asignada,
+      // extendida por la duración del testing configurada (1 o 2 semanas)
       const hoursEntry = hoursByEpic[item.id];
       const qaVer = hoursEntry && hoursEntry.qaVersion ? qaVersionsList.find(v => v.name === hoursEntry.qaVersion) : null;
       if (!isQuarter && qaVer && item.endDate) {
         const devEnd = (item._maxDescEnd && item._maxDescEnd > item.endDate.getTime()) ? new Date(item._maxDescEnd) : item.endDate;
         const devEndOff = doff(devEnd);
-        const qaEndOff = sprintBoundaryOff(qaVer.date);
+        const qaDurationDays = (hoursEntry.qaDurationWeeks || 0) * 7;
+        const qaEndOff = sprintBoundaryOff(qaVer.date) + qaDurationDays;
         const qaLeft = px(devEndOff + 1);
         const qaW = Math.max(px(qaEndOff - devEndOff), 6);
-        const qaTip = `QA — ${esc(item.title)}&#10;Se prueba en: ${esc(qaVer.name)} (${fmtD(qaVer.date)})&#10;Desarrollo terminó: ${fmtD(devEnd)}`;
+        const qaEndDate = new Date(tlStart.getTime() + qaEndOff * 86400000);
+        const durTxt = hoursEntry.qaDurationWeeks ? `&#10;Duración del testing: ${hoursEntry.qaDurationWeeks} semana(s) — hasta ${fmtD(qaEndDate)}` : '';
+        const qaTip = `QA — ${esc(item.title)}&#10;Se prueba en: ${esc(qaVer.name)} (${fmtD(qaVer.date)})&#10;Desarrollo terminó: ${fmtD(devEnd)}${durTxt}`;
         barHtml += `<div class="gbar-qa" style="left:${qaLeft}px;width:${qaW}px"
           onmouseenter="showTip(event,'${qaTip}')" onmouseleave="hideTip()">
           <span class="gbar-lbl">QA · ${esc(qaVer.name)}</span>
@@ -2007,6 +2012,13 @@ function renderHoursGrid() {
           ${parseQaVersions(document.getElementById('cfgQaVersions') ? document.getElementById('cfgQaVersions').value : '').map(v =>
             `<option value="${esc(v.name)}"${r.qaVersion === v.name ? ' selected' : ''}>${esc(v.name)} · ${fmtD(v.date)}</option>`
           ).join('')}
+        </select>
+      </td>
+      <td>
+        <select onchange="hoursRowsDraft[${i}].qaDurationWeeks=this.value" title="Cuánto dura el testing a partir de la versión asignada">
+          <option value=""${!r.qaDurationWeeks ? ' selected' : ''}>—</option>
+          <option value="1"${r.qaDurationWeeks === '1' ? ' selected' : ''}>1 semana</option>
+          <option value="2"${r.qaDurationWeeks === '2' ? ' selected' : ''}>2 semanas</option>
         </select>
       </td>
       <td><button type="button" class="hg-delbtn" onclick="removeHoursRow(${i})" title="Eliminar etapa">✕</button></td>
@@ -2520,7 +2532,7 @@ function refreshHours() {
     const real = r.real || 0;
     // El estimado ampliado es simplemente: estimado original + horas adicionales
     const est = estBase + upgradeHours;
-    return { extId: null, name: r.name, real, est, estBase, upgradeHours, manualQ: r.q || null, planned: r.planned !== false, pinId: r.pinId || null, qaVersion: r.qaVersion || '' };
+    return { extId: null, name: r.name, real, est, estBase, upgradeHours, manualQ: r.q || null, planned: r.planned !== false, pinId: r.pinId || null, qaVersion: r.qaVersion || '', qaDurationWeeks: r.qaDurationWeeks || 0 };
   });
   matchHoursToEpics();
   if (activeTab === 'alto-nivel') renderAltoNivel();
