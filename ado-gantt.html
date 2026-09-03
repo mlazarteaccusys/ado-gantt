@@ -1507,10 +1507,24 @@ function render() {
 
   const todayLine = '';
 
+  // Si una fecha coincide con el fin de un sprint, la celda de ese sprint ya se dibuja
+  // estirada hasta el inicio del siguiente (tapa el fin de semana) — así que el offset
+  // visual real de "fin de este sprint" es el inicio del próximo, no su endDate.
+  function sprintBoundaryOff(date) {
+    const off = doff(date);
+    for (let i = 0; i < validIters.length; i++) {
+      if (doff(validIters[i].endDate) === off) {
+        const next = validIters[i + 1];
+        return next ? doff(next.startDate) : off;
+      }
+    }
+    return off;
+  }
+
   // ── Líneas verticales de versiones del ambiente de QA ────────────────────────
   let qaVersionLinesHtml = '';
   for (const v of qaVersionsList) {
-    const vOff = doff(v.date);
+    const vOff = sprintBoundaryOff(v.date);
     if (vOff < 0 || vOff > tlDays) continue; // fuera del rango visible del timeline
     const left = px(vOff);
     qaVersionLinesHtml += `<div class="qa-version-line" style="left:${left}px"
@@ -1616,7 +1630,7 @@ function render() {
       if (!isQuarter && qaVer && item.endDate) {
         const devEnd = (item._maxDescEnd && item._maxDescEnd > item.endDate.getTime()) ? new Date(item._maxDescEnd) : item.endDate;
         const devEndOff = doff(devEnd);
-        const qaEndOff = doff(qaVer.date);
+        const qaEndOff = sprintBoundaryOff(qaVer.date);
         const qaLeft = px(devEndOff + 1);
         const qaW = Math.max(px(qaEndOff - devEndOff), 6);
         const qaTip = `QA — ${esc(item.title)}&#10;Se prueba en: ${esc(qaVer.name)} (${fmtD(qaVer.date)})&#10;Desarrollo terminó: ${fmtD(devEnd)}`;
