@@ -1625,17 +1625,17 @@ function render() {
           </div>`;
         }
       }
-      // Barra de QA: desde que termina el desarrollo hasta la versión de ambiente asignada,
-      // extendida por la duración del testing configurada (1 o 2 semanas)
+      // Barra de QA: arranca cuando se lanza la versión de ambiente asignada (no antes,
+      // aunque el desarrollo haya terminado mucho antes) y dura lo configurado en semanas.
       const hoursEntry = hoursByEpic[item.id];
       const qaVer = hoursEntry && hoursEntry.qaVersion ? qaVersionsList.find(v => v.name === hoursEntry.qaVersion) : null;
       if (!isQuarter && qaVer && item.endDate) {
         const devEnd = (item._maxDescEnd && item._maxDescEnd > item.endDate.getTime()) ? new Date(item._maxDescEnd) : item.endDate;
-        const devEndOff = doff(devEnd);
+        const qaStartOff = sprintBoundaryOff(qaVer.date);
         const qaDurationDays = (hoursEntry.qaDurationWeeks || 0) * 7;
-        const qaEndOff = sprintBoundaryOff(qaVer.date) + qaDurationDays;
-        const qaLeft = px(devEndOff + 1);
-        const qaW = Math.max(px(qaEndOff - devEndOff), 6);
+        const qaEndOff = qaStartOff + qaDurationDays;
+        const qaLeft = px(qaStartOff);
+        const qaW = Math.max(px(qaEndOff - qaStartOff), 6);
         const qaEndDate = new Date(tlStart.getTime() + qaEndOff * 86400000);
         const durTxt = hoursEntry.qaDurationWeeks ? `&#10;Duración del testing: ${hoursEntry.qaDurationWeeks} semana(s) — hasta ${fmtD(qaEndDate)}` : '';
         const qaTip = `QA — ${esc(item.title)}&#10;Se prueba en: ${esc(qaVer.name)} (${fmtD(qaVer.date)})&#10;Desarrollo terminó: ${fmtD(devEnd)}${durTxt}`;
