@@ -366,6 +366,11 @@ a.ititle:hover { color: #2563eb; text-decoration: underline; }
       <input type="password" id="cfgPat" placeholder="Pegá tu PAT aquí" autocomplete="off" />
       <small>Permisos necesarios: Work Items (Read), Project and Team (Read).</small>
     </div>
+    <div class="config-field">
+      <label>Google Sheet ID <span style="font-weight:400;text-transform:none">(base de datos compartida de horas y versiones QA)</span></label>
+      <input type="text" id="cfgSheetId" placeholder="Ej: 1yl1U2LSI2qPwes3wqt32_IkOv8e25zZWqeyJjrbV2do" />
+      <small>El Sheet debe tener hojas llamadas <b>Horas</b> y <b>VersionesQA</b>, y estar compartido como "Cualquiera con el enlace puede ver". <span id="sheetStatus"></span></small>
+    </div>
     <div class="config-row">
       <div class="config-field">
         <label>Ancho de día (px)</label>
@@ -650,6 +655,64 @@ function parseQaVersions(text) {
     if (!d || !m || !y) return null;
     return { name, date: new Date(y, m - 1, d, 12, 0, 0) };
   }).filter(Boolean).sort((a, b) => a.date - b.date);
+}
+
+// ─── Google Sheet como base de datos compartida de horas y versiones QA ────────
+// Lee dos hojas ("Horas" y "VersionesQA") de un Sheet público (compartido como
+// "Cualquiera con el enlace puede ver"), vía el endpoint gviz sin necesidad de API key.
+// Parser CSV simple: soporta comillas dobles y comas dentro de campos citados.
+function parseCsv(text) {
+  const rows = [];
+  let row = [], field = '', inQuotes = false;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (inQuotes) {
+      if (c === '"') {
+        if (text[i + 1] === '"') { field += '"'; i++; }
+        else inQuotes = false;
+      } else field += c;
+    } else {
+      if (c === '"') inQuotes = true;
+      else if (c === ',') { row.push(field); field = ''; }
+      else if (c === '\n' || c === '\r') {
+        if (c === '\r' && text[i + 1] === '\n') i++;
+        row.push(field); field = '';
+        if (row.length > 1 || row[0] !== '') rows.push(row);
+        row = [];
+      } else field += c;
+    }
+  }
+  if (field !== '' || row.length) { row.push(field); rows.push(row); }
+  return rows;
+}
+
+async function fetchSheetCsv(sheetId, sheetName) {
+  const url = `https://docs.google.com/spreadsheets/d/${encodeURIComponent(sheetId)}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(sheetName)}`;
+  const r = await fetch(url);
+  if (!r.ok) throw new Error(`No se pudo leer la hoja "${sheetName}" (HTTP ${r.status}). Verificá que el Sheet esté compartido como "Cualquiera con el enlace puede ver".`);
+  const text = await r.text();
+  if (/^<!DOCTYPE html/i.test(text.trim())) throw new Error(`La hoja "${sheetName}" no es accesible — verificá que el Sheet esté compartido públicamente.`);
+  return parseCsv(text);
+}
+
+// Trae "Horas" y "VersionesQA" del Sheet y devuelve { hoursRows, qaVersionsText } en el
+// mismo formato que usaba la config manual, para no tocar el resto del pipeline.
+async function fetchSheetData(sheetId) {
+  const [horasRows, verRows] = await Promise.all([
+    fetchSheetCsv(sheetId, 'Horas'),
+    fetchSheetCsv(sheetId, 'VersionesQA'),
+  ]);
+  const [, ...horasBody] = horasRows; // descarta el header
+  const hoursRows = horasBody.filter(r => r[0] && r[0].trim()).map(r => ({
+    name: (r[0] || '').trim(),
+    real: r[1] || '', est: r[2] || '', upgrade: r[3] || '',
+    q: (r[4] || '').trim(), planned: (r[5] || '').trim().toUpperCase() !== 'FALSE',
+    qaVersion: (r[6] || '').trim(), qaDurationWeeks: (r[7] || '').trim(),
+  }));
+  const [, ...verBody] = verRows;
+  const qaVersionsText = verBody.filter(r => r[0] && r[0].trim() && r[1] && r[1].trim())
+    .map(r => `${r[0].trim()},${r[1].trim()}`).join('\n');
+  return { hoursRows, qaVersionsText };
 }
 
 // ─── Fetch teams ───────────────────────────────────────────────────────────────
@@ -2156,9 +2219,14 @@ function matchHoursToEpics() {
   for (const e of hoursData) {
     // Si la fila está "pineada" a un ID real de ADO, se usa directo — sin esto,
     // renombrar la Epic en ADO deja la fila huérfana y crea una duplicada.
+    // Si esa Epic no aparece en el equipo/filtro actual, la fila NO cae al fuzzy-matching
+    // genérico (podría "pegarse" por error a una Epic de OTRO equipo con nombre similar) —
+    // queda sin Epic vinculada, y renderAltoNivel la oculta por no pertenecer a este equipo.
     if (e.pinId) {
       const pinned = epics.find(ep => ep.id === e.pinId);
-      if (pinned) { e.epicId = pinned.id; e.epicNode = pinned; hoursByEpic[e.epicId] = e; continue; }
+      if (pinned) { e.epicId = pinned.id; e.epicNode = pinned; hoursByEpic[e.epicId] = e; }
+      else { e.epicId = null; e.epicNode = null; }
+      continue;
     }
     const et = normTokens(e.name);
     const eV2 = /\bV2\b/i.test(e.name);
@@ -2310,14 +2378,18 @@ function toggleQuarterCollapse(q) {
 
 function renderAltoNivel() {
   const panel = document.getElementById('altoNivelPanel');
-  if (!hoursData.length) {
+  // Oculta filas pineadas a una Epic que no pertenece al equipo/filtro actual —
+  // sin esto, al cambiar de equipo seguían apareciendo etapas de equipos anteriores.
+  // Las filas sin pin (cargadas a mano) siempre se muestran, como antes.
+  const visibleHoursData = hoursData.filter(e => !e.pinId || e.epicId);
+  if (!visibleHoursData.length) {
     panel.innerHTML = `<div class="an-empty">Pegá el reporte semanal de horas en ⚙️ Config para ver esta vista.</div>`;
     return;
   }
 
-  const totEst = hoursData.reduce((a, e) => a + e.est, 0);
-  const totEstBase = hoursData.reduce((a, e) => a + e.estBase, 0);
-  const totReal = hoursData.reduce((a, e) => a + e.real, 0);
+  const totEst = visibleHoursData.reduce((a, e) => a + e.est, 0);
+  const totEstBase = visibleHoursData.reduce((a, e) => a + e.estBase, 0);
+  const totReal = visibleHoursData.reduce((a, e) => a + e.real, 0);
   const totUpgrade = totEst - totEstBase;
   const desvio = totReal - totEst;
   const desvPct = totEst ? Math.round(desvio / totEst * 1000) / 10 : 0;
@@ -2331,9 +2403,9 @@ function renderAltoNivel() {
   const desvioOriginal = totReal - totEstBase;
   const desvPctOriginal = totEstBase ? Math.round(desvioOriginal / totEstBase * 1000) / 10 : 0;
   const desvClassOriginal = desvioOriginal > totEstBase * 0.05 ? 'bad' : (desvioOriginal > 0 ? 'warn' : 'ok');
-  const projProg = projectProgress(hoursData);
-  const plannedOnly = hoursData.filter(e => e.planned);
-  const hasUnplanned = plannedOnly.length !== hoursData.length;
+  const projProg = projectProgress(visibleHoursData);
+  const plannedOnly = visibleHoursData.filter(e => e.planned);
+  const hasUnplanned = plannedOnly.length !== visibleHoursData.length;
   const projProgPlanned = hasUnplanned ? projectProgress(plannedOnly) : null;
 
   function rowHtml(e) {
@@ -2383,7 +2455,7 @@ function renderAltoNivel() {
 
   // Agrupar por trimestre comprometido
   const byQ = {};
-  for (const e of hoursData) { const q = stageQuarter(e); (byQ[q] = byQ[q] || []).push(e); }
+  for (const e of visibleHoursData) { const q = stageQuarter(e); (byQ[q] = byQ[q] || []).push(e); }
   const qOrder = ['Q1', 'Q2', 'Q3', 'Q4', '—'].filter(q => byQ[q]);
   let qHtml = '';
   for (const q of qOrder) {
