@@ -28,13 +28,14 @@ body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Robo
 .hg-table { width: 100%; border-collapse: collapse; font-size: 13px; table-layout: fixed; }
 .hg-table th { text-align: left; font-weight: 600; color: #888; text-transform: uppercase; font-size: 10px; letter-spacing: .5px; padding: 4px 6px; border-bottom: 1px solid #e2e4e9; }
 .hg-table td { padding: 4px; border-bottom: 1px solid #f0f1f3; }
-.hg-table th:nth-child(1), .hg-table td:nth-child(1) { width: 38%; }
-.hg-table th:nth-child(2), .hg-table td:nth-child(2) { width: 13%; }
-.hg-table th:nth-child(3), .hg-table td:nth-child(3) { width: 13%; }
-.hg-table th:nth-child(4), .hg-table td:nth-child(4) { width: 13%; }
-.hg-table th:nth-child(5), .hg-table td:nth-child(5) { width: 8%; }
-.hg-table th:nth-child(6), .hg-table td:nth-child(6) { width: 8%; }
-.hg-table th:nth-child(7), .hg-table td:nth-child(7) { width: 3%; }
+.hg-table th:nth-child(1), .hg-table td:nth-child(1) { width: 30%; }
+.hg-table th:nth-child(2), .hg-table td:nth-child(2) { width: 11%; }
+.hg-table th:nth-child(3), .hg-table td:nth-child(3) { width: 11%; }
+.hg-table th:nth-child(4), .hg-table td:nth-child(4) { width: 11%; }
+.hg-table th:nth-child(5), .hg-table td:nth-child(5) { width: 7%; }
+.hg-table th:nth-child(6), .hg-table td:nth-child(6) { width: 7%; }
+.hg-table th:nth-child(7), .hg-table td:nth-child(7) { width: 16%; }
+.hg-table th:nth-child(8), .hg-table td:nth-child(8) { width: 3%; }
 .hg-table input, .hg-table select { width: 100%; padding: 8px 10px; border: 1px solid #e2e4e9; border-radius: 6px; font-size: 13px; box-sizing: border-box; }
 .hg-table input:focus, .hg-table select:focus { outline: none; border-color: #2563eb; }
 .hg-table td:nth-child(2) input, .hg-table td:nth-child(3) input, .hg-table td:nth-child(4) input { text-align: right; }
@@ -233,6 +234,12 @@ a.ititle:hover { color: #2563eb; text-decoration: underline; }
 .gbar-dash { position: absolute; height: 22px; top: 9px; border-radius: 4px; border: 2px dashed #ccc; display: flex; align-items: center; padding: 0 6px; overflow: hidden; opacity: 0.7; z-index: 4; }
 .gbar-dash .gbar-lbl { color: #999; }
 
+/* Barra de QA: tramo posterior al fin del desarrollo de una Epic (config manual) */
+.gbar-qa { position: absolute; height: 22px; top: 9px; border-radius: 4px; z-index: 5; cursor: default;
+  display: flex; align-items: center; padding: 0 6px; overflow: hidden;
+  background: #ea9a4d; opacity: 0.9; }
+.gbar-qa .gbar-lbl { color: #fff; font-size: 10px; font-weight: 700; white-space: nowrap; text-shadow: 0 1px 2px rgba(0,0,0,.35); }
+
 /* Tramo de desvío: los hijos terminan después de la fecha planificada */
 .gbar-over { position: absolute; height: 22px; top: 9px; border-radius: 0 4px 4px 0; z-index: 6; cursor: pointer;
   display: flex; align-items: center; padding: 0 6px; overflow: hidden;
@@ -369,7 +376,7 @@ a.ititle:hover { color: #2563eb; text-decoration: underline; }
       <label>Horas por etapa <span style="font-weight:400;text-transform:none">(cargá o editá los datos a mano en la grilla)</span></label>
       <table class="hg-table">
         <thead>
-          <tr><th>Etapa</th><th>Consumidas</th><th>Estimadas</th><th>Adicionales</th><th>Q</th><th title="Estaba en el alcance original">Planif.</th><th></th></tr>
+          <tr><th>Etapa</th><th>Consumidas</th><th>Estimadas</th><th>Adicionales</th><th>Q</th><th title="Estaba en el alcance original">Planif.</th><th title="Agrega una barra de QA en el Gantt después de que termina el desarrollo de esta etapa">QA post-dev</th><th></th></tr>
         </thead>
         <tbody id="hoursGridBody"></tbody>
       </table>
@@ -517,7 +524,7 @@ function decodeShareData(str) {
 function shareHoursLink() {
   const data = {
     hoursRows: hoursRowsDraft.filter(r => r.name && r.name.trim())
-      .map(r => ({ name: r.name.trim(), real: parseNum(r.real), est: parseNum(r.est), upgrade: parseNum(r.upgrade), q: r.q || '', planned: r.planned !== false, pinId: r.pinId || null })),
+      .map(r => ({ name: r.name.trim(), real: parseNum(r.real), est: parseNum(r.est), upgrade: parseNum(r.upgrade), q: r.q || '', planned: r.planned !== false, pinId: r.pinId || null, qaWeeks: parseInt(r.qaWeeks) || 0 })),
   };
   const url = `${location.origin}${location.pathname}#horas=${encodeShareData(data)}`;
   const btn = document.getElementById('shareHoursBtn');
@@ -565,7 +572,7 @@ function saveConfig() {
     maxItems: parseInt(document.getElementById('cfgMax').value) || 500,
     hoursRows: hoursRowsDraft
       .filter(r => r.name && r.name.trim())
-      .map(r => ({ name: r.name.trim(), real: parseNum(r.real), est: parseNum(r.est), upgrade: parseNum(r.upgrade), q: r.q || '', planned: r.planned !== false, pinId: r.pinId || null })),
+      .map(r => ({ name: r.name.trim(), real: parseNum(r.real), est: parseNum(r.est), upgrade: parseNum(r.upgrade), q: r.q || '', planned: r.planned !== false, pinId: r.pinId || null, qaWeeks: parseInt(r.qaWeeks) || 0 })),
   };
   localStorage.setItem('adoGanttCfg2', JSON.stringify(cfg));
   document.getElementById('configOverlay').style.display = 'none';
@@ -1566,6 +1573,19 @@ function render() {
           </div>`;
         }
       }
+      // Barra de QA: post-desarrollo, según semanas configuradas en la grilla de horas
+      const hoursEntry = hoursByEpic[item.id];
+      if (!isQuarter && hoursEntry && hoursEntry.qaWeeks > 0 && item.endDate) {
+        const devEnd = (item._maxDescEnd && item._maxDescEnd > item.endDate.getTime()) ? new Date(item._maxDescEnd) : item.endDate;
+        const qaDays = hoursEntry.qaWeeks * 7;
+        const qaLeft = px(doff(devEnd) + 1);
+        const qaW = Math.max(px(qaDays), 6);
+        const qaTip = `QA — ${esc(item.title)}&#10;${hoursEntry.qaWeeks} semana(s) después del desarrollo&#10;Desde: ${fmtD(new Date(devEnd.getTime() + 86400000))}`;
+        barHtml += `<div class="gbar-qa" style="left:${qaLeft}px;width:${qaW}px"
+          onmouseenter="showTip(event,'${qaTip}')" onmouseleave="hideTip()">
+          <span class="gbar-lbl">QA</span>
+        </div>`;
+      }
     } else if (item.iter) {
       const left = px(doff(item.iter.startDate));
       const days = Math.max(doff(item.iter.endDate) - doff(item.iter.startDate) + 1, 1);
@@ -1926,6 +1946,14 @@ function renderHoursGrid() {
       </td>
       <td style="text-align:center">
         <input type="checkbox" title="Estaba en el alcance original" ${r.planned !== false ? 'checked' : ''} onchange="hoursRowsDraft[${i}].planned=this.checked" />
+      </td>
+      <td>
+        <select onchange="hoursRowsDraft[${i}].qaWeeks=this.value" title="Agrega una barra de QA en el Gantt, que arranca cuando termina el desarrollo de esta etapa">
+          <option value=""${!r.qaWeeks ? ' selected' : ''}>Sin QA</option>
+          <option value="1"${r.qaWeeks === '1' ? ' selected' : ''}>1 semana</option>
+          <option value="2"${r.qaWeeks === '2' ? ' selected' : ''}>2 semanas</option>
+          <option value="3"${r.qaWeeks === '3' ? ' selected' : ''}>3 semanas</option>
+        </select>
       </td>
       <td><button type="button" class="hg-delbtn" onclick="removeHoursRow(${i})" title="Eliminar etapa">✕</button></td>
     </tr>`).join('');
@@ -2437,7 +2465,7 @@ function refreshHours() {
     const real = r.real || 0;
     // El estimado ampliado es simplemente: estimado original + horas adicionales
     const est = estBase + upgradeHours;
-    return { extId: null, name: r.name, real, est, estBase, upgradeHours, manualQ: r.q || null, planned: r.planned !== false, pinId: r.pinId || null };
+    return { extId: null, name: r.name, real, est, estBase, upgradeHours, manualQ: r.q || null, planned: r.planned !== false, pinId: r.pinId || null, qaWeeks: r.qaWeeks || 0 };
   });
   matchHoursToEpics();
   if (activeTab === 'alto-nivel') renderAltoNivel();
