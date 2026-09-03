@@ -2082,6 +2082,8 @@ function renderHoursGrid() {
           <option value=""${!r.qaDurationWeeks ? ' selected' : ''}>—</option>
           <option value="1"${r.qaDurationWeeks === '1' ? ' selected' : ''}>1 semana</option>
           <option value="2"${r.qaDurationWeeks === '2' ? ' selected' : ''}>2 semanas</option>
+          <option value="3"${r.qaDurationWeeks === '3' ? ' selected' : ''}>3 semanas</option>
+          <option value="4"${r.qaDurationWeeks === '4' ? ' selected' : ''}>4 semanas</option>
         </select>
       </td>
       <td><button type="button" class="hg-delbtn" onclick="removeHoursRow(${i})" title="Eliminar etapa">✕</button></td>
