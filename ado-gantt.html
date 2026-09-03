@@ -252,6 +252,10 @@ a.ititle:hover { color: #2563eb; text-decoration: underline; }
 .today-line { position: absolute; top: 0; bottom: 0; width: 2px; background: #ef4444; z-index: 20; pointer-events: none; }
 .today-tip { position: absolute; top: -1px; left: -22px; background: #ef4444; color: white; font-size: 10px; font-weight: 700; padding: 2px 5px; border-radius: 3px; white-space: nowrap; }
 
+/* ── Líneas de versión del ambiente de QA ── */
+.qa-version-line { position: absolute; top: 0; bottom: 0; width: 2px; background: #ea9a4d; z-index: 15; cursor: default; }
+.qa-version-tag { position: absolute; top: 2px; left: 4px; background: #ea9a4d; color: white; font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 3px; white-space: nowrap; }
+
 /* ── Sprint bg shading ── */
 .sprint-bg { position: absolute; top: 0; bottom: 0; z-index: 1; }
 .sprint-bg.even { background: rgba(0,0,0,.015); }
@@ -373,10 +377,15 @@ a.ititle:hover { color: #2563eb; text-decoration: underline; }
       </div>
     </div>
     <div class="config-field">
+      <label>Versiones del ambiente de QA <span style="font-weight:400;text-transform:none">(formato: Nombre,DD/MM/YYYY — uno por línea, en orden cronológico)</span></label>
+      <textarea id="cfgQaVersions" rows="4" style="width:100%;padding:8px 12px;border:1px solid #ddd;border-radius:6px;font-size:12px;font-family:monospace;resize:vertical" placeholder="v1.0,15/08/2026&#10;v1.1,29/08/2026" oninput="renderHoursGrid()"></textarea>
+      <small>Cada fecha marca cuándo se actualizó/actualiza el ambiente de QA. Se dibuja como línea vertical en el Gantt.</small>
+    </div>
+    <div class="config-field">
       <label>Horas por etapa <span style="font-weight:400;text-transform:none">(cargá o editá los datos a mano en la grilla)</span></label>
       <table class="hg-table">
         <thead>
-          <tr><th>Etapa</th><th>Consumidas</th><th>Estimadas</th><th>Adicionales</th><th>Q</th><th title="Estaba en el alcance original">Planif.</th><th title="Agrega una barra de QA en el Gantt después de que termina el desarrollo de esta etapa">QA post-dev</th><th></th></tr>
+          <tr><th>Etapa</th><th>Consumidas</th><th>Estimadas</th><th>Adicionales</th><th>Q</th><th title="Estaba en el alcance original">Planif.</th><th title="En qué actualización del ambiente de QA se prueba esta etapa">Versión QA</th><th></th></tr>
         </thead>
         <tbody id="hoursGridBody"></tbody>
       </table>
@@ -501,6 +510,7 @@ let cfg = {};
 let teams = [];         // { id, name }
 let selectedTeam = ''; // team name currently selected
 let iterations = [];   // { id, name, path, startDate, endDate }
+let qaVersionsList = []; // [{name, date}] — actualizaciones del ambiente de QA, desde cfg.qaVersionsText
 let workItems = [];    // processed items
 let collapsed = new Set();
 let activeTypes = new Set(['Epic','Feature','User Story','Technical Task','Task','Bug','Improvement']);
@@ -524,7 +534,7 @@ function decodeShareData(str) {
 function shareHoursLink() {
   const data = {
     hoursRows: hoursRowsDraft.filter(r => r.name && r.name.trim())
-      .map(r => ({ name: r.name.trim(), real: parseNum(r.real), est: parseNum(r.est), upgrade: parseNum(r.upgrade), q: r.q || '', planned: r.planned !== false, pinId: r.pinId || null, qaWeeks: parseInt(r.qaWeeks) || 0 })),
+      .map(r => ({ name: r.name.trim(), real: parseNum(r.real), est: parseNum(r.est), upgrade: parseNum(r.upgrade), q: r.q || '', planned: r.planned !== false, pinId: r.pinId || null, qaVersion: r.qaVersion || '' })),
   };
   const url = `${location.origin}${location.pathname}#horas=${encodeShareData(data)}`;
   const btn = document.getElementById('shareHoursBtn');
@@ -570,9 +580,10 @@ function saveConfig() {
     team: document.getElementById('cfgTeam').value.trim(),
     dayW: parseInt(document.getElementById('cfgDayW').value) || 28,
     maxItems: parseInt(document.getElementById('cfgMax').value) || 500,
+    qaVersionsText: document.getElementById('cfgQaVersions').value,
     hoursRows: hoursRowsDraft
       .filter(r => r.name && r.name.trim())
-      .map(r => ({ name: r.name.trim(), real: parseNum(r.real), est: parseNum(r.est), upgrade: parseNum(r.upgrade), q: r.q || '', planned: r.planned !== false, pinId: r.pinId || null, qaWeeks: parseInt(r.qaWeeks) || 0 })),
+      .map(r => ({ name: r.name.trim(), real: parseNum(r.real), est: parseNum(r.est), upgrade: parseNum(r.upgrade), q: r.q || '', planned: r.planned !== false, pinId: r.pinId || null, qaVersion: r.qaVersion || '' })),
   };
   localStorage.setItem('adoGanttCfg2', JSON.stringify(cfg));
   document.getElementById('configOverlay').style.display = 'none';
@@ -593,6 +604,7 @@ function showConfig() {
   document.getElementById('cfgPat').value = cfg.pat || '';
   document.getElementById('cfgDayW').value = cfg.dayW || 28;
   document.getElementById('cfgMax').value = cfg.maxItems || 500;
+  document.getElementById('cfgQaVersions').value = cfg.qaVersionsText || '';
   // Migración: si nunca se guardó la grilla pero sí hay un reporte viejo pegado, precargarla desde ahí.
   const legacyRows = (!cfg.hoursRows || !cfg.hoursRows.length) && cfg.hoursText
     ? parseHours(cfg.hoursText).map(e => ({ name: e.name, real: e.real, est: e.est, upgrade: '' }))
@@ -624,6 +636,19 @@ function parseAdoDate(str) {
   const m = String(str).match(/^(\d{4})-(\d{2})-(\d{2})/);
   if (!m) return new Date(str);
   return new Date(+m[1], +m[2] - 1, +m[3], 12, 0, 0);
+}
+
+// Parsea "Nombre,DD/MM/YYYY" (una versión de ambiente QA por línea) → [{name, date}], ordenado por fecha.
+function parseQaVersions(text) {
+  if (!text || !text.trim()) return [];
+  return text.trim().split('\n').map(line => {
+    const parts = line.split(',').map(s => s.trim());
+    if (parts.length < 2) return null;
+    const [name, dateStr] = parts;
+    const [d, m, y] = dateStr.split('/').map(Number);
+    if (!d || !m || !y) return null;
+    return { name, date: new Date(y, m - 1, d, 12, 0, 0) };
+  }).filter(Boolean).sort((a, b) => a.date - b.date);
 }
 
 // ─── Fetch teams ───────────────────────────────────────────────────────────────
@@ -1482,6 +1507,18 @@ function render() {
 
   const todayLine = '';
 
+  // ── Líneas verticales de versiones del ambiente de QA ────────────────────────
+  let qaVersionLinesHtml = '';
+  for (const v of qaVersionsList) {
+    const vOff = doff(v.date);
+    if (vOff < 0 || vOff > tlDays) continue; // fuera del rango visible del timeline
+    const left = px(vOff);
+    qaVersionLinesHtml += `<div class="qa-version-line" style="left:${left}px"
+      onmouseenter="showTip(event,'Versión de ambiente QA&#10;${esc(v.name)} — ${fmtD(v.date)}')" onmouseleave="hideTip()">
+      <span class="qa-version-tag">${esc(v.name)}</span>
+    </div>`;
+  }
+
   // ── Row HTML ────────────────────────────────────────────────────────────────
   // barGeom/rowIndexById: se completan durante el loop para poder dibujar las
   // flechas de dependencia después (necesitan la posición en px de cada barra).
@@ -1573,17 +1610,19 @@ function render() {
           </div>`;
         }
       }
-      // Barra de QA: post-desarrollo, según semanas configuradas en la grilla de horas
+      // Barra de QA: desde que termina el desarrollo hasta la versión de ambiente asignada
       const hoursEntry = hoursByEpic[item.id];
-      if (!isQuarter && hoursEntry && hoursEntry.qaWeeks > 0 && item.endDate) {
+      const qaVer = hoursEntry && hoursEntry.qaVersion ? qaVersionsList.find(v => v.name === hoursEntry.qaVersion) : null;
+      if (!isQuarter && qaVer && item.endDate) {
         const devEnd = (item._maxDescEnd && item._maxDescEnd > item.endDate.getTime()) ? new Date(item._maxDescEnd) : item.endDate;
-        const qaDays = hoursEntry.qaWeeks * 7;
-        const qaLeft = px(doff(devEnd) + 1);
-        const qaW = Math.max(px(qaDays), 6);
-        const qaTip = `QA — ${esc(item.title)}&#10;${hoursEntry.qaWeeks} semana(s) después del desarrollo&#10;Desde: ${fmtD(new Date(devEnd.getTime() + 86400000))}`;
+        const devEndOff = doff(devEnd);
+        const qaEndOff = doff(qaVer.date);
+        const qaLeft = px(devEndOff + 1);
+        const qaW = Math.max(px(qaEndOff - devEndOff), 6);
+        const qaTip = `QA — ${esc(item.title)}&#10;Se prueba en: ${esc(qaVer.name)} (${fmtD(qaVer.date)})&#10;Desarrollo terminó: ${fmtD(devEnd)}`;
         barHtml += `<div class="gbar-qa" style="left:${qaLeft}px;width:${qaW}px"
           onmouseenter="showTip(event,'${qaTip}')" onmouseleave="hideTip()">
-          <span class="gbar-lbl">QA</span>
+          <span class="gbar-lbl">QA · ${esc(qaVer.name)}</span>
         </div>`;
       }
     } else if (item.iter) {
@@ -1660,6 +1699,7 @@ function render() {
           <div style="position:relative;width:${totalW}px">
             ${timeAxis === 'month' ? monthBgHtml : sprintBgHtml}
             ${todayLine}
+            ${qaVersionLinesHtml}
             <div id="rightBody">${rightRows}</div>
             ${depSvgHtml}
           </div>
@@ -1948,11 +1988,11 @@ function renderHoursGrid() {
         <input type="checkbox" title="Estaba en el alcance original" ${r.planned !== false ? 'checked' : ''} onchange="hoursRowsDraft[${i}].planned=this.checked" />
       </td>
       <td>
-        <select onchange="hoursRowsDraft[${i}].qaWeeks=this.value" title="Agrega una barra de QA en el Gantt, que arranca cuando termina el desarrollo de esta etapa">
-          <option value=""${!r.qaWeeks ? ' selected' : ''}>Sin QA</option>
-          <option value="1"${r.qaWeeks === '1' ? ' selected' : ''}>1 semana</option>
-          <option value="2"${r.qaWeeks === '2' ? ' selected' : ''}>2 semanas</option>
-          <option value="3"${r.qaWeeks === '3' ? ' selected' : ''}>3 semanas</option>
+        <select onchange="hoursRowsDraft[${i}].qaVersion=this.value" title="En qué actualización del ambiente de QA se prueba esta etapa">
+          <option value=""${!r.qaVersion ? ' selected' : ''}>Sin QA</option>
+          ${parseQaVersions(document.getElementById('cfgQaVersions') ? document.getElementById('cfgQaVersions').value : '').map(v =>
+            `<option value="${esc(v.name)}"${r.qaVersion === v.name ? ' selected' : ''}>${esc(v.name)} · ${fmtD(v.date)}</option>`
+          ).join('')}
         </select>
       </td>
       <td><button type="button" class="hg-delbtn" onclick="removeHoursRow(${i})" title="Eliminar etapa">✕</button></td>
@@ -2454,6 +2494,7 @@ async function toggleDependencies() {
 
 // Re-parsea las horas, las asocia a Epics y refresca el panel
 function refreshHours() {
+  qaVersionsList = parseQaVersions(cfg.qaVersionsText || '');
   // Compatibilidad: si todavía no se guardó la grilla nueva pero hay un reporte
   // viejo pegado (cfg.hoursText, de antes de la grilla), usarlo hasta que se guarde Config.
   const rows = (cfg.hoursRows && cfg.hoursRows.length) ? cfg.hoursRows
@@ -2465,7 +2506,7 @@ function refreshHours() {
     const real = r.real || 0;
     // El estimado ampliado es simplemente: estimado original + horas adicionales
     const est = estBase + upgradeHours;
-    return { extId: null, name: r.name, real, est, estBase, upgradeHours, manualQ: r.q || null, planned: r.planned !== false, pinId: r.pinId || null, qaWeeks: r.qaWeeks || 0 };
+    return { extId: null, name: r.name, real, est, estBase, upgradeHours, manualQ: r.q || null, planned: r.planned !== false, pinId: r.pinId || null, qaVersion: r.qaVersion || '' };
   });
   matchHoursToEpics();
   if (activeTab === 'alto-nivel') renderAltoNivel();
