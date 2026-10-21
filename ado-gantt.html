@@ -931,7 +931,7 @@ async function fetchWorkItems(areaFilter = '') {
 // padre-hijo, trayendo TODOS los descendientes sin importar su área (así no se pierden
 // hijos —p. ej. Improvements— que estén en otra área que la de su padre).
 async function fetchWorkItemsHierarchy(areaFilter = '') {
-  const NOTREM = "NOT IN ('Removed','Cut','Cancelled','Rejected','Withdrawn')";
+  const NOTREM = "NOT IN ('Removed','Cut','Cancelled','Rejected','Reject','Withdrawn')";
   const srcArea = areaFilter ? areaFilter.replace(/\[System\.AreaPath\]/g, 'Source.[System.AreaPath]') : '';
   // Con filtro de equipo: anclar en CUALQUIER ítem del área (Epic, Feature, etc.).
   // Sin filtro: anclar solo en Epics/Improvements para no traer el proyecto entero.
@@ -962,7 +962,7 @@ async function fetchWorkItemsHierarchy(areaFilter = '') {
 // Consulta plana (fallback): lista chata con tope $top.
 async function fetchWorkItemsFlat(areaFilter = '') {
   const maxItems = cfg.maxItems || 500;
-  const wiql = { query: `SELECT [System.Id] FROM WorkItems WHERE [System.TeamProject] = @project AND [System.WorkItemType] IN ('Epic','Feature','User Story','Technical Task','Technical task','Task','Bug','Improvement','Improvements') AND [System.State] NOT IN ('Removed','Cut','Cancelled','Rejected','Withdrawn') ${areaFilter} ORDER BY [System.WorkItemType] ASC, [System.Id] ASC` };
+  const wiql = { query: `SELECT [System.Id] FROM WorkItems WHERE [System.TeamProject] = @project AND [System.WorkItemType] IN ('Epic','Feature','User Story','Technical Task','Technical task','Task','Bug','Improvement','Improvements') AND [System.State] NOT IN ('Removed','Cut','Cancelled','Rejected','Reject','Withdrawn') ${areaFilter} ORDER BY [System.WorkItemType] ASC, [System.Id] ASC` };
   const r = await fetch(`${base()}/_apis/wit/wiql?$top=${maxItems}&api-version=7.1`, {
     method: 'POST', headers: authHdr(), body: JSON.stringify(wiql)
   });
@@ -1086,11 +1086,20 @@ function calcProgress(node) {
 
 let fullTree = []; // árbol completo, reconstruido solo cuando cambian los datos
 
+// Estados que significan "esto no cuenta": rechazado, cancelado, removido, etc.
+// Se filtran acá (y no solo en el WIQL) por si el proyecto usa una variante del
+// nombre que el query no contempló (p.ej. "Reject" en vez de "Rejected").
+const EXCLUDED_STATES = ['removed', 'cut', 'cancelled', 'rejected', 'reject', 'withdrawn'];
+function isExcludedState(state) {
+  return EXCLUDED_STATES.includes((state || '').toLowerCase());
+}
+
 function buildFullTree() {
+  const visibleItems = workItems.filter(it => !isExcludedState(it.state));
   const map = {};
-  for (const it of workItems) { it.children = []; map[it.id] = it; }
+  for (const it of visibleItems) { it.children = []; map[it.id] = it; }
   const roots = [];
-  for (const it of workItems) {
+  for (const it of visibleItems) {
     if (it.parentId && map[it.parentId]) {
       map[it.parentId].children.push(it);
     } else {
